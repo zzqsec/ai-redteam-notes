@@ -487,9 +487,4 @@ ax.log("[+] Extension loaded!");
 
 ---
 
-## 附：AddUser-BOF 完整源码（参考）
 
-最终可用的 [AddUser-BOF](https://github.com/your-repo) 移植版本见 `adduser.axs`，支持：
-
-- `adduser_bof` — NetUserAdd API 添加管理员
-- `adduserbysamr` — SAMR 协议绕过 360/EDR
