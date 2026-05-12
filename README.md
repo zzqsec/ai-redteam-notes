@@ -29,6 +29,35 @@ PHP Webshell 生成的完整方法论，包含：
 
 ---
 
+### 📄 AdaptixC2 BOF 插件编写指南
+
+从 CS (Cobalt Strike) 移植 BOF 到 AdaptixC2 的完整教程，包含：
+
+| 模块 | 内容 |
+|------|------|
+| **基础概念** | BOF/Beacon/AxScript 是什么、AdaptixC2 对 CS BOF 的兼容边界 |
+| **项目结构** | 标准目录布局 + BOF 命名规范 |
+| **AxScript 全解** | 命令注册、参数打包、PreHook/PostHook 编写、右键菜单 |
+| **CS → AdaptixC2 映射表** | `bof_pack` 类型对照（`Z`→`wstr` 等）、API 一一对应 |
+| **BOF 参数打包** | 5 种类型的含义与选型、字符串乱码根因与修复 |
+| **踩坑清单** | Command not found / 用户名乱码 / menu.add() 报错 等经典问题 |
+| **完整模板** | 可直接复用的 `.axs` 脚本骨架 |
+
+配套实战案例：AddUser-BOF（NetUserAdd + SAMR 双路径）的完整移植。
+
+---
+
+---
+
+## 📦 更新日志
+
+| 日期 | 内容 |
+|------|------|
+| 2026-05-12 | 新增 `AdaptixC2 BOF 插件编写指南` — CS → AdaptixC2 BOF 移植全流程 + 踩坑清单 |
+| 2026-05-12 | 初始提交 `PHP 免杀技术点清单` — 6 套方案 + 哥斯拉 V3 微步 TDP 绕过 + 实战踩坑 |
+
+---
+
 ## 为什么叫 "AI Redteam"
 
 - **生成方式**：所有文档均由 AI 根据安全研究经验生成初稿，人工审核修正
