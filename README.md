@@ -66,12 +66,29 @@ Java Webshell + 内存马的技术框架，包含：
 
 ---
 
+### 📄 Ghost Bits (Cast Attack) 技术总结
+
+> 来源：Black Hat Asia 2026 — 浅蓝 @ AlibabaCloud
+
+Java `char` 是 16 位，但大量 API 只取低 8 位，**高位被静默丢弃**——利用这个特性可构造不同解析器看到不同内容的攻击。涵盖：
+
+| 模块 | 内容 |
+|------|------|
+| **9 种攻击技术** | BCEL ClassLoader 绕过、Jackson SQLi、Fastjson `\u`/`\x` 转义、Tomcat 文件上传、全角 URL 路径穿越、JDK Base64 解码、GeoServer RCE 绕过、Jetty 二次编码、SMTP 协议注入 |
+| **Ghost Bit 字符映射表** | 10 组 Unicode → ASCII 的单向映射（`.` `/` `0`-`9` `e` `j` `%` 等） |
+| **4 个 CVE** | CVE-2025-41242 (Spring)、CVE-2025-7962 (SMTP)、CVE-2026-21933 (JDK)、CVE-2024-36401 (GeoServer) |
+| **渗透实战** | 立即可用的 Payload 模板 + 自动化扫描脚本 + 代码审计关注点 |
+| **供应链发现** | ActiveJ / Lettuce / XMLWriter / Jodd 等组件的 Ghost Bits 漏洞 |
+
+---
+
 ---
 
 ## 📦 更新日志
 
 | 日期 | 内容 |
 |------|------|
+| 2026-05-12 | 新增 `Ghost Bits 技术总结` — Black Hat Asia 2026 · 9 种攻击技术 + 4 CVE + 渗透实战指南 |
 | 2026-05-12 | 新增 `Java 免杀技术点清单` ⚠️ 未测试 — Webshell 5 方案 + 内存马 5 类型 + 高阶对抗，待各 JDK 版本验证 |
 | 2026-05-12 | 新增 `AdaptixC2 BOF 插件编写指南` — CS → AdaptixC2 BOF 移植全流程 + 踩坑清单 |
 | 2026-05-12 | 初始提交 `PHP 免杀技术点清单` — 6 套方案 + 哥斯拉 V3 微步 TDP 绕过 + 实战踩坑 |
