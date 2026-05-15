@@ -33,51 +33,6 @@
 
 ---
 
-### 📄 Impacket PowerShell 绕过技术 ✅
-
-Impacket 工具集 PowerShell 全链路特征拆解与绕过：
-
-| 模块 | 内容 |
-|------|------|
-| **6种执行路径** | psexec/smbexec/wmiexec/dcomexec/atexec/注册表 — 各自PS脚本特征差异 |
-| **AV/EDR检测** | ScriptBlock日志/AMSI拦截/CLM约束/ETW/参数编码检测 |
-| **源码分析** | 精确到文件+函数+行号的修改点 |
-| **绕过矩阵** | BXOR+Int16编码/ScriptBlock::Create替代iex/Base58+Z85编码轮换/AMSI+CLM组合 |
-| **流量特征** | SMB命名管道/DCOM CLSID指纹/135端口行为 + Suricata规则 |
-| **源码修改方案** | EvasivePayloadEncoder Python类 + 一键patch脚本 |
-
-#### psexec.py 7维度专项 + 5个实战修改方案
-
-| 方案 | 耗时 | 绕过效果 |
-|------|------|---------|
-| 服务名随机化 | 5分钟 | 绕过事件日志IOC |
-| 管道名伪装 | 10分钟 | 绕过Suricata/Zeek流量规则 |
-| 自编译exe替换 | 30分钟 | Defender/360哈希查杀绕过 |
-| WMI替代服务 | 1-2小时 | 无7045/4697事件 |
-| Shellcode Loader | 3-5小时 | 无cmd/powershell进程链 |
-
----
-
-### 📄 ADCS PKI 攻击链技术手册 ✅
-
-Active Directory Certificate Services 攻击链，11维度全覆盖：
-
-| 模块 | 内容 |
-|------|------|
-| **架构全景** | CA角色/模板/AIA/CDP/Forest Trust + 攻击面映射 |
-| **ESC全矩阵** | ESC1-ESC13 每个漏洞的Certipy命令+利用条件+影响 |
-| **模板攻击面** | CT_FLAG标志位 + Python模板审计脚本 |
-| **NDES/SCEP** | 接口利用 + Python POC + 防御配置 |
-| **Web Enrollment** | DLL侧加载/Path Traversal + IIS硬化脚本 |
-| **PKINIT** | 完整Python实现核心逻辑 |
-| **NTLM中继** | ESC8/ESC10/ESC13 + Python自动化框架 |
-| **检测防御** | Event 4886/4887/4898 + Sysmon + Sigma + 安全基线 |
-| **工具对比** | Certipy vs Certify vs Pkinit vs 手搓Python |
-| **ESC组合链** | ESC1+ESC8/ESC3+ESC9叠加攻击 |
-| **提权路径** | 3条DA路径（成功率85%/70%/90%） |
-
----
-
 ### 📄 PHP 免杀技术点清单
 
 PHP Webshell 生成的完整方法论，包含：
@@ -173,9 +128,7 @@ Java `char` 是 16 位，但大量 API 只取低 8 位，**高位被静默丢弃
 | 日期 | 内容 |
 |------|------|
 | 2026-05-15 | `Java免杀技术点清单` ✅ 实战验证 — 新增哥斯拉六层全开方案F、JDK/Tomcat版本兼容详情、8条坑点记录 |
-| 2026-05-14 | 新增 `微步TDP全链路绕过技术手册` ✅ N1 PRO MAX FLASH — 8维度TDP全链路检测机制与绕过 |
-| 2026-05-14 | 新增 `Impacket_PowerShell绕过技术` ✅ N1 PRO MAX FLASH — Impacket全工具PS特征+绕过矩阵+psexec专项+5个实战修改方案 |
-| 2026-05-14 | 新增 `ADCS_PKI攻击链技术手册` ✅ N1 PRO MAX FLASH — ESC1-ESC13全矩阵+3条DA路径+Python自动化框架 |
+| 2026-05-14 | 新增 `微步TDP全链路绕过技术手册` ✅ — 8维度TDP全链路检测机制与绕过 |
 | 2026-05-12 | 新增 `360 QVM 免杀技术手册` ✅ 实战验证 — QVM 7大特征维度还原 + 5 种冷门执行 + 全维度绕过率 97.2% |
 | 2026-05-12 | 新增 `Ghost Bits 技术总结` — Black Hat Asia 2026 · 9 种攻击技术 + 4 CVE + 渗透实战指南 |
 | 2026-05-12 | 新增 `AdaptixC2 BOF 插件编写指南` — CS → AdaptixC2 BOF 移植全流程 + 踩坑清单 |
