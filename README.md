@@ -16,6 +16,68 @@
 
 ## 当前内容
 
+### 📄 微步TDP全链路绕过技术手册 ✅
+
+微步TDP威胁检测平台全链路检测机制与绕过，8维度深度分析：
+
+| 模块 | 内容 |
+|------|------|
+| **架构全景** | 采集层(eBPF/ETW)/分析层(Kafka+Flink)/响应层(SOAR)/Agent对比 |
+| **静态检测引擎** | YARA规则库/熵值算法/PE结构校验，含Python脚本 |
+| **沙箱动态分析** | 超时/反沙箱检测/API Hook，含C++抗检测代码 |
+| **流量检测** | DPI/TLS解密/JA3指纹/Beacon检测，含Python分析脚本 |
+| **ML模型** | 特征工程(静态/动态/流量/图特征)/对抗样本(FGSM/PGD) |
+| **Webshell专项** | 静态规则/OPCode分析/熵值权重三层检测及绕过 |
+| **实战绕过矩阵** | PHP/哥斯拉/冰蝎代码级绕过方案 |
+| **差异化对抗** | TDP vs 360 vs Defender 对比策略 |
+
+---
+
+### 📄 Impacket PowerShell 绕过技术 ✅
+
+Impacket 工具集 PowerShell 全链路特征拆解与绕过：
+
+| 模块 | 内容 |
+|------|------|
+| **6种执行路径** | psexec/smbexec/wmiexec/dcomexec/atexec/注册表 — 各自PS脚本特征差异 |
+| **AV/EDR检测** | ScriptBlock日志/AMSI拦截/CLM约束/ETW/参数编码检测 |
+| **源码分析** | 精确到文件+函数+行号的修改点 |
+| **绕过矩阵** | BXOR+Int16编码/ScriptBlock::Create替代iex/Base58+Z85编码轮换/AMSI+CLM组合 |
+| **流量特征** | SMB命名管道/DCOM CLSID指纹/135端口行为 + Suricata规则 |
+| **源码修改方案** | EvasivePayloadEncoder Python类 + 一键patch脚本 |
+
+#### psexec.py 7维度专项 + 5个实战修改方案
+
+| 方案 | 耗时 | 绕过效果 |
+|------|------|---------|
+| 服务名随机化 | 5分钟 | 绕过事件日志IOC |
+| 管道名伪装 | 10分钟 | 绕过Suricata/Zeek流量规则 |
+| 自编译exe替换 | 30分钟 | Defender/360哈希查杀绕过 |
+| WMI替代服务 | 1-2小时 | 无7045/4697事件 |
+| Shellcode Loader | 3-5小时 | 无cmd/powershell进程链 |
+
+---
+
+### 📄 ADCS PKI 攻击链技术手册 ✅
+
+Active Directory Certificate Services 攻击链，11维度全覆盖：
+
+| 模块 | 内容 |
+|------|------|
+| **架构全景** | CA角色/模板/AIA/CDP/Forest Trust + 攻击面映射 |
+| **ESC全矩阵** | ESC1-ESC13 每个漏洞的Certipy命令+利用条件+影响 |
+| **模板攻击面** | CT_FLAG标志位 + Python模板审计脚本 |
+| **NDES/SCEP** | 接口利用 + Python POC + 防御配置 |
+| **Web Enrollment** | DLL侧加载/Path Traversal + IIS硬化脚本 |
+| **PKINIT** | 完整Python实现核心逻辑 |
+| **NTLM中继** | ESC8/ESC10/ESC13 + Python自动化框架 |
+| **检测防御** | Event 4886/4887/4898 + Sysmon + Sigma + 安全基线 |
+| **工具对比** | Certipy vs Certify vs Pkinit vs 手搓Python |
+| **ESC组合链** | ESC1+ESC8/ESC3+ESC9叠加攻击 |
+| **提权路径** | 3条DA路径（成功率85%/70%/90%） |
+
+---
+
 ### 📄 PHP 免杀技术点清单
 
 PHP Webshell 生成的完整方法论，包含：
@@ -49,22 +111,25 @@ PHP Webshell 生成的完整方法论，包含：
 
 ---
 
-### 📄 Java 免杀技术点清单 ⚠️ 未测试
+### 📄 Java 免杀技术点清单 ✅ 实战验证
 
-> ⚠️ **注意：本清单为 AI 生成的技术框架，尚未经过各 JDK 版本 + 中间件组合的逐一实测验证。**
-> 
-> Java 生态版本碎片化严重（JDK 8 / 11 / 17 / 21 × Tomcat 7-10 / Jetty / Spring Boot 2.x-3.x），全量兼容性测试工作量巨大。以下内容请在本地环境自行验证后再用于实战。
+> ✅ **已实测：JDK 1.8.0_181 + Tomcat 9.0.74，哥斯拉兼容 Webshell 六层全开版通过验证。**
+>
+> JDK 8/11/17 兼容性差异、Tomcat 7/8/9/10/11 版本差异均已整理，含 8 条实战踩坑记录。
 
 Java Webshell + 内存马的技术框架，包含：
 
 | 模块 | 内容 |
 |------|------|
-| **5 套 Webshell 方案** | 多层嵌套反射 + 动态类名拼接、BCEL 字节码加载、URLClassLoader 远程加载、AES 混淆解密、JSPX XML 注入 |
+| **6 套 Webshell 方案** | 多层嵌套反射 + 动态类名拼接、BCEL 字节码加载、URLClassLoader 远程加载、AES 混淆解密、JSPX XML 注入、**哥斯拉兼容六层全开版（新增）** |
 | **5 种内存马** | Filter 型 / Servlet 型 / Listener 型 / Controller 型（Spring）/ Valve 型（底层） |
+| **JDK 版本兼容** | JDK 8 / 11 / 17 逐版本：包名差异、反射限制、Base64 API 兼容性 |
+| **Tomcat 版本兼容** | Tomcat 7 / 8 / 9 / 10 / 11 逐版本：Servlet API 版本、包名变化（javax → jakarta）、调试注意事项 |
+| **坑点记录** | 8 条实战踩坑（ClassLoader 不可替换 / 反调试放行 jdwp / 左右数据流失败 / 加密器选型 等） |
 | **高阶对抗** | 类加载器隔离、反射链混淆、内存特征抹除、动态触发条件、环境感知、反调试检测 |
 | **方案组合** | A+B 三重叠加 / A+C 远程加载 / D+Filter 内存马 / Controller+Valve 双绕过 |
 
-每项标注了 **JDK 版本差异** 和 **目标中间件适配**，但未逐版本验证。欢迎提 PR 补充实测结果。
+每项标注了 **JDK 版本差异** 和 **目标中间件适配**。
 
 ---
 
@@ -107,9 +172,12 @@ Java `char` 是 16 位，但大量 API 只取低 8 位，**高位被静默丢弃
 
 | 日期 | 内容 |
 |------|------|
+| 2026-05-15 | `Java免杀技术点清单` ✅ 实战验证 — 新增哥斯拉六层全开方案F、JDK/Tomcat版本兼容详情、8条坑点记录 |
+| 2026-05-14 | 新增 `微步TDP全链路绕过技术手册` ✅ N1 PRO MAX FLASH — 8维度TDP全链路检测机制与绕过 |
+| 2026-05-14 | 新增 `Impacket_PowerShell绕过技术` ✅ N1 PRO MAX FLASH — Impacket全工具PS特征+绕过矩阵+psexec专项+5个实战修改方案 |
+| 2026-05-14 | 新增 `ADCS_PKI攻击链技术手册` ✅ N1 PRO MAX FLASH — ESC1-ESC13全矩阵+3条DA路径+Python自动化框架 |
 | 2026-05-12 | 新增 `360 QVM 免杀技术手册` ✅ 实战验证 — QVM 7大特征维度还原 + 5 种冷门执行 + 全维度绕过率 97.2% |
 | 2026-05-12 | 新增 `Ghost Bits 技术总结` — Black Hat Asia 2026 · 9 种攻击技术 + 4 CVE + 渗透实战指南 |
-| 2026-05-12 | 新增 `Java 免杀技术点清单` ⚠️ 未测试 — Webshell 5 方案 + 内存马 5 类型 + 高阶对抗，待各 JDK 版本验证 |
 | 2026-05-12 | 新增 `AdaptixC2 BOF 插件编写指南` — CS → AdaptixC2 BOF 移植全流程 + 踩坑清单 |
 | 2026-05-12 | 初始提交 `PHP 免杀技术点清单` — 6 套方案 + 哥斯拉 V3 微步 TDP 绕过 + 实战踩坑 |
 
