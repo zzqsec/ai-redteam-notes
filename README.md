@@ -124,6 +124,7 @@ Impacket (wmiexec/smbexec/dcomexec) PowerShell 执行特征分析与绕过改造
 
 | 日期 | 内容 |
 |------|------|
+| 2026-05-16 | `AdaptixC2 BOF 插件编写指南` ✅ 实战验证 |
 | 2026-05-16 | 新增 `Impacket PowerShell 绕过技术手册` 🧪 测试中 — BXOR + AMSI 改造 wmiexec/smbexec/dcomexec，待实战验证 |
 | 2026-05-15 | `Java免杀技术点清单` ✅ 实战验证 — 新增哥斯拉六层全开方案F、JDK/Tomcat版本兼容详情、8条坑点记录 |
 | 2026-05-12 | 新增 `360 QVM 免杀技术手册` ✅ 实战验证 — QVM 7大特征维度还原 + 5 种冷门执行 + 全维度绕过率 97.2% |
