@@ -32,7 +32,7 @@ PHP Webshell 生成的完整方法论，包含：
 
 ---
 
-### 📄 AdaptixC2 BOF 插件编写指南
+### 📄 AdaptixC2 BOF 插件编写指南 ✅ 实战验证
 
 从 CS (Cobalt Strike) 移植 BOF 到 AdaptixC2 的完整教程，包含：
 
