@@ -1,6 +1,6 @@
 # Impacket PowerShell 特征与绕过技术手册
 
-> 合法授权的渗透测试与安全研究 | 更新日期：2026-05-16
+> 合法授权的渗透测试与安全研究 | 更新日期：2026-05-16 | 环境部署补全：2026-05-16
 > 原始分析：N1 PRO MAX FLASH | 实战改造：v0.11.0 → v0.11.0-evasive
 
 ---
@@ -182,12 +182,116 @@ TRUSTED_PIPES = [
 
 ---
 
-## 四、实际代码改造记录（已验证）
+## 四、环境依赖与部署
+
+### 4.1 基础环境要求
+
+| 项目 | 要求 |
+|------|------|
+| Python | **3.8+**（改造验证于 Python 3.13） |
+| 操作系统 | Windows / Linux（改造涉及 Windows 管道名特性） |
+| 原始 Impacket | **v0.11.0**（`impacket-0.11.0`） |
+
+### 4.2 Python 依赖
+
+```bash
+pip install pycryptodome pyasn1 pyOpenSSL six
+```
+
+| 依赖 | 版本（已验证） | 说明 |
+|------|---------------|------|
+| `pycryptodome` | 3.23.0 | Impacket 依赖，提供 Crypto 模块 |
+| `pyasn1` | - | ASN.1 编解码 |
+| `pyOpenSSL` | - | TLS 支持 |
+| `six` | - | Python 2/3 兼容层 |
+
+### 4.3 ⚠️ Cryptodome 导入别名修复
+
+实测发现：`pip install pycryptodome` 安装的是 `Crypto` 包，但 Impacket 源码中写的是 `from Cryptodome import ...`（首字母大写 d）。部分环境下可能缺失该别名，需要手动修复：
+
+**方案一：创建别名目录（推荐）**
+
+```bash
+# Windows — 创建软链接
+mklink /D "F:\QwenPaw\lib\site-packages\Cryptodome" "F:\QwenPaw\lib\site-packages\Crypto"
+
+# Linux/macOS
+ln -sfn /path/to/site-packages/Crypto /path/to/site-packages/Cryptodome
+```
+
+**方案二：运行时注入（适合快速测试）**
+
+```python
+import sys
+import Crypto
+sys.modules['Cryptodome'] = Crypto   # 在 import impacket 之前执行
+```
+
+验证是否正常：
+
+```bash
+python -c "import Cryptodome; print('[OK] Cryptodome alias 正常')"
+```
+
+### 4.4 部署结构
+
+改造后的 Impacket 推荐目录结构：
+
+```
+impacket-0.11.0/                    # 改造后的主目录
+├── impacket/
+│   ├── __init__.py
+│   ├── examples/
+│   │   ├── evasive_encoder.py      # 🆕 新增：BXOR + AMSI + 参数/管道池（共享模块）
+│   │   └── serviceinstall.py       # 🔧 修改：管道名随机化
+│   └── version.py                  # 🔧 修改：pkg_resources 兼容
+├── examples/
+│   ├── wmiexec.py                  # 🔧 修改：BXOR + AMSI + 参数随机化
+│   ├── smbexec.py                  # 🔧 修改：同上 + 管道名随机化
+│   ├── dcomexec.py                 # 🔧 修改：同上 + CLSID 随机化
+│   ├── psexec.py                   # 🔧 修改：管道名随机化
+│   └── services.py                 # 🔧 修改：管道名随机化
+└── impacket-0.11.0_backup/         # 原始版本备份（改造前）
+```
+
+### 4.5 快速验证
+
+改造完成后执行以下命令验证所有模块可正常导入：
+
+```bash
+cd impacket-0.11.0
+python -c "
+from impacket.examples.evasive_encoder import EvasivePayloadEncoder, random_pipe_name
+from examples.wmiexec import WMIEXEC
+from examples.smbexec import CMDEXEC
+from examples.dcomexec import DCOMEXEC
+from examples.psexec import PSEXEC
+from examples.services import SVCCTL
+print('[OK] 所有模块导入正常')
+"
+```
+
+### 4.6 实测验证结果（2026-05-16）
+
+| 测试项 | 结果 |
+|--------|------|
+| BXOR 编码每次唯一 | ✅ 100%（XOR key 2-5字节随机） |
+| AMSI Bypass v1/v2 随机切换 | ✅ |
+| 参数变体池 | ✅ 5/6 种轮换 |
+| 管道名池大小 | ✅ 10 种，`svcctl` 出现 0/200 采样 |
+| `-Enc` 特征消除 | ✅ 完全消除 |
+| Cryptodome 别名修复 | ✅ 已验证 |
+| wmiexec/smbexec/dcomexec 导入 | ✅ |
+| serviceinstall/psexec/services 导入 | ✅ |
+
+---
+
+## 五、实际代码改造记录（已验证）
 
 > 改造日期：2026-05-16 | 原始版本：impacket-0.11.0
 > 备份：`impacket-0.11.0_backup/` | 位置：`F:/CC/网安/Tools/内网工具/域/impacket/`
 
-### 4.1 改造成果总览
+### 5.1 改造成果总览
 
 | 文件 | 改动 | 消除特征 |
 |------|------|---------|
@@ -200,7 +304,7 @@ TRUSTED_PIPES = [
 | `impacket/examples/serviceinstall.py` | `openSvcManager()` 管道名 + 文件名长度随机化 | 管道 + 文件命名 |
 | `impacket/version.py` | pkg_resources → importlib.metadata | Py3.13 兼容 |
 
-### 4.2 改造详情
+### 5.2 改造详情
 
 #### evasive_encoder.py（新增）
 
@@ -317,7 +421,7 @@ parser.add_argument('-object', ..., default=None, help='... (default=random)')
 +     _HAS_PKG_RESOURCES = False
 ```
 
-### 4.3 测试验证
+### 5.3 测试验证
 
 ```bash
 cd impacket-0.11.0
@@ -343,7 +447,7 @@ print('All imports OK')
 
 ---
 
-## 五、待改进项
+## 六、待改进项
 
 | 项目 | 状态 | 原因 |
 |------|------|------|
