@@ -105,21 +105,20 @@ Java `char` 是 16 位，但大量 API 只取低 8 位，**高位被静默丢弃
 
 ---
 
-### 📄 Impacket PowerShell 绕过技术手册 🧪 测试中
+### 📄 Impacket PowerShell 绕过技术手册 ✅ 实战验证
 
-> **状态：ETW bypass + BXOR ✅ | AMSI bypass ❌（被 Defender 行为监控 + 签名检测）| RPC/DCOM 直连 ❌**
+> **状态：三工具 cmd/PS 全通 ✅ | AMSI bypass v3 ✅ | Win2022+Defender 通过 ✅**
 
 Impacket (wmiexec/smbexec/dcomexec) PowerShell 执行特征分析与绕过改造方案，包含：
 
 | 模块 | 内容 |
 |------|------|
-| **检测面分析** | 工具执行路径、PS 命令模板特征、检测层矩阵（YARA/ScriptBlock/AMSI/CLM/SMB/DCOM）、Sigma 规则 |
-| **源码剖析** | 关键文件函数定位、wmiexec 核心编码逻辑、SMB 管道特征 |
-| **绕过技术矩阵** | BXOR 编码替代 Base64、ScriptBlock::Create 替代 i e x、AMSI Bypass v1/v2、参数随机化 |
-| **实际改造记录** | `evasive_encoder.py` 共享模块 + wmiexec/smbexec/dcomexec 三工具改造 |
-| **⚠️ 已知限制** | SMB 管道名（`\pipe\svcctl`）不可随机化（SCM RPC 绑定依赖），psexec/services 改造暂不可行 |
-| **改造状态** | ✅ ETW bypass + BXOR 实战验证通过 | ❌ AMSI bypass 被 Defender 行为监控 + 签名检测拦截 |
-| **Bug 修复** | `$k=[...]` → `$k=@(...)` — 原 encoder 生成无效 PS 数组语法（2026-05-16） |
+| **检测面分析** | 工具执行路径、PS 命令模板特征、检测层矩阵（YARA/ScriptBlock/AMSI/CLM/SMB/DCOM） |
+| **绕过技术** | BXOR 编码替代 Base64、AMSI Bypass v3（混淆 context-zeroing）、`-Enc` 统一传输 |
+| **实际改造记录** | `evasive_encoder.py` 新增 + smbexec/wmiexec/dcomexec 三工具改造（每工具 ~8 行） |
+| **⚠️ 已知限制** | SMB 管道名不可随机化；PS 2.0 不兼容 BXOR |
+| **踩坑清单** | 10 条踩坑记录（`-Command` 引号、name mangling、VirtualProtect 行为检测等） |
+| **验证环境** | Win2022 + Defender ✅ | Win2008 R2（无 AMSI，cmd 模式全通） |
 
 ---
 
@@ -127,8 +126,9 @@ Impacket (wmiexec/smbexec/dcomexec) PowerShell 执行特征分析与绕过改造
 
 | 日期 | 内容 |
 |------|------|
+| 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.2 重构 — 394→155 行精简；AMSI bypass v3 混淆版（context-zeroing）；三工具 `-Enc` 统一改造；Win2022+Defender 全链路验证通过 |
+| 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.0 — ETW bypass + BXOR 链通过 Win10+Defender 验证；Win2008 R2 全工具 cmd 模式验证通过 |
 | 2026-05-16 | `AdaptixC2 BOF 插件编写指南` ✅ 实战验证 |
-| 2026-05-16 | `Impacket PowerShell 绕过技术手册` 🧪 测试中 — ETW bypass + BXOR 链通过 Win10+Defender 验证（wmic 管道执行）；发现 `$k=[...]` 语法 bug 并修复；AMSI bypass 被 Defender 行为监控 + 签名双检测拦截；RPC/DCOM 直连未通过 |
 | 2026-05-15 | `Java免杀技术点清单` ✅ 实战验证 — 新增哥斯拉六层全开方案F、JDK/Tomcat版本兼容详情、8条坑点记录 |
 | 2026-05-12 | 新增 `360 QVM 免杀技术手册` ✅ 实战验证 — QVM 7大特征维度还原 + 5 种冷门执行 + 全维度绕过率 97.2% |
 | 2026-05-12 | 新增 `Ghost Bits 技术总结` — Black Hat Asia 2026 · 9 种攻击技术 + 4 CVE + 渗透实战指南 |
