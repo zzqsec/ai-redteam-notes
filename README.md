@@ -105,12 +105,26 @@ Java `char` 是 16 位，但大量 API 只取低 8 位，**高位被静默丢弃
 
 ---
 
+### 📄 Impacket PowerShell 绕过技术手册 🧪 测试中
+
+Impacket (wmiexec/smbexec/dcomexec) PowerShell 执行特征分析与绕过改造方案，包含：
+
+| 模块 | 内容 |
+|------|------|
+| **检测面分析** | 工具执行路径、PS 命令模板特征、检测层矩阵（YARA/ScriptBlock/AMSI/CLM/SMB/DCOM）、Sigma 规则 |
+| **源码剖析** | 关键文件函数定位、wmiexec 核心编码逻辑、SMB 管道特征 |
+| **绕过技术矩阵** | BXOR 编码替代 Base64、ScriptBlock::Create 替代 i e x、AMSI Bypass v1/v2、参数随机化 |
+| **实际改造记录** | `evasive_encoder.py` 共享模块 + wmiexec/smbexec/dcomexec 三工具改造 |
+| **⚠️ 已知限制** | SMB 管道名（`\pipe\svcctl`）不可随机化（SCM RPC 绑定依赖），psexec/services 改造暂不可行 |
+| **改造状态** | Python 模块改造完成，**待实战环境验证 wmiexec/dcomexec 实际绕过效果** |
+
 ---
 
 ## 📦 更新日志
 
 | 日期 | 内容 |
 |------|------|
+| 2026-05-16 | 新增 `Impacket PowerShell 绕过技术手册` 🧪 测试中 — BXOR + AMSI 改造 wmiexec/smbexec/dcomexec，待实战验证 |
 | 2026-05-15 | `Java免杀技术点清单` ✅ 实战验证 — 新增哥斯拉六层全开方案F、JDK/Tomcat版本兼容详情、8条坑点记录 |
 | 2026-05-12 | 新增 `360 QVM 免杀技术手册` ✅ 实战验证 — QVM 7大特征维度还原 + 5 种冷门执行 + 全维度绕过率 97.2% |
 | 2026-05-12 | 新增 `Ghost Bits 技术总结` — Black Hat Asia 2026 · 9 种攻击技术 + 4 CVE + 渗透实战指南 |
@@ -151,6 +165,6 @@ AI 生成的内容也欢迎 — 但必须标注"AI 生成"并经过人工验证�
 
 ## 许可
 
-MIT License — 研究自由，后果自负。
+CC BY-NC-SA 4.0 — 学习交流自由，禁止商业用途和 AI 训练爬取。
 
 > 致敬所有在免杀对抗领域默默耕耘的前辈 — 站在巨人的肩膀上，我们才能看得更远。
