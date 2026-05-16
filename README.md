@@ -105,9 +105,9 @@ Java `char` 是 16 位，但大量 API 只取低 8 位，**高位被静默丢弃
 
 ---
 
-### 📄 Impacket PowerShell 绕过技术手册 ✅ 实战验证
+### 📄 Impacket PowerShell 绕过技术手册 🧪 测试中
 
-> **状态：ETW bypass + BXOR ✅ | AMSI bypass ❌（被 Defender 行为监控 + 签名检测）**
+> **状态：ETW bypass + BXOR ✅ | AMSI bypass ❌（被 Defender 行为监控 + 签名检测）| RPC/DCOM 直连 ❌**
 
 Impacket (wmiexec/smbexec/dcomexec) PowerShell 执行特征分析与绕过改造方案，包含：
 
@@ -128,8 +128,7 @@ Impacket (wmiexec/smbexec/dcomexec) PowerShell 执行特征分析与绕过改造
 | 日期 | 内容 |
 |------|------|
 | 2026-05-16 | `AdaptixC2 BOF 插件编写指南` ✅ 实战验证 |
-| 2026-05-16 | `Impacket PowerShell 绕过技术手册` 🧪 → ✅ 实战验证 — ETW bypass + BXOR 链通过 Win10+Defender 验证；发现 `$k=[...]` 语法 bug 并修复；AMSI bypass 被 Defender 行为监控 + 签名双检测拦截 |
-| 2026-05-16 | 新增 `Impacket PowerShell 绕过技术手册` 🧪 测试中 — BXOR + AMSI 改造 wmiexec/smbexec/dcomexec
+| 2026-05-16 | `Impacket PowerShell 绕过技术手册` 🧪 测试中 — ETW bypass + BXOR 链通过 Win10+Defender 验证（wmic 管道执行）；发现 `$k=[...]` 语法 bug 并修复；AMSI bypass 被 Defender 行为监控 + 签名双检测拦截；RPC/DCOM 直连未通过 |
 | 2026-05-15 | `Java免杀技术点清单` ✅ 实战验证 — 新增哥斯拉六层全开方案F、JDK/Tomcat版本兼容详情、8条坑点记录 |
 | 2026-05-12 | 新增 `360 QVM 免杀技术手册` ✅ 实战验证 — QVM 7大特征维度还原 + 5 种冷门执行 + 全维度绕过率 97.2% |
 | 2026-05-12 | 新增 `Ghost Bits 技术总结` — Black Hat Asia 2026 · 9 种攻击技术 + 4 CVE + 渗透实战指南 |
