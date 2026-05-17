@@ -131,8 +131,8 @@ fscan 内网扫描器针对火绒/360 的完整免杀方案，包含：
 | 模块 | 内容 |
 |------|------|
 | **火绒 vs 360 检测差异** | 火绒认 Go PE 结构（rt0 入口 + pclntab magic + 节区名），360 认 UPX 解压后 `.rdata` 明文字符串 |
-| **5 套免杀方案** | A 编译+PE清洗 / B Garble混淆+PE清洗 / **C DLL化（主战）** / E strip+PE清洗 / F 源码字符串全量去特征 |
-| **方案 C：DLL 化** | c-shared DLL + C Loader，55KB 纯 C 载入 49MB DLL，**唯一绕过火绒 rt0 入口汇编检测** |
+| **5 套免杀方案** | A 编译+PE清洗 / B Garble混淆+PE清洗 / C DLL化（主战）/ E strip+PE清洗 / F 源码字符串全量去特征 |
+| **方案 C：DLL 化** | c-shared DLL + C Loader，55KB 纯 C 载入 49MB DLL |
 | **方案 B：Garble** | Garble `-literals` AES 加密 `.rdata` 全部字面量，360 解压也扫不到明文字符串 |
 | **pe_cleaner.py** | 四步清洗：pclntab magic 清零 / 节区名重命名 / 时间戳清零 / BuildID 标记擦除 |
 | **核心结论** | 五个方案无壳全过火绒+360；**一加 UPX，360 全部查杀** |
