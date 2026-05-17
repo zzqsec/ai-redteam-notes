@@ -122,10 +122,31 @@ Impacket (wmiexec/smbexec/dcomexec) PowerShell 执行特征分析与绕过改造
 
 ---
 
+### 📄 fscan 免杀特征点与解决技术手册 ✅ 实战验证
+
+> 实测：2026-05-17，火绒 V5.x + 360 V15.x
+
+fscan 内网扫描器针对火绒/360 的完整免杀方案，包含：
+
+| 模块 | 内容 |
+|------|------|
+| **火绒 vs 360 检测差异** | 火绒认 Go PE 结构（rt0 入口 + pclntab magic + 节区名），360 认 UPX 解压后 `.rdata` 明文字符串 |
+| **5 套免杀方案** | A 编译+PE清洗 / B Garble混淆+PE清洗 / **C DLL化（主战）** / E strip+PE清洗 / F 源码字符串全量去特征 |
+| **方案 C：DLL 化** | c-shared DLL + C Loader，55KB 纯 C 载入 49MB DLL，**唯一绕过火绒 rt0 入口汇编检测** |
+| **方案 B：Garble** | Garble `-literals` AES 加密 `.rdata` 全部字面量，360 解压也扫不到明文字符串 |
+| **pe_cleaner.py** | 四步清洗：pclntab magic 清零 / 节区名重命名 / 时间戳清零 / BuildID 标记擦除 |
+| **核心结论** | 五个方案无壳全过火绒+360；**一加 UPX，360 全部查杀** |
+| **踩坑清单** | 10 条（UPX 是最大坑、go-strip 不兼容 Go 1.26、c-archive `runtime/cgo` 缺失 等）|
+
+每套方案标注了**产物体积、目录位置、编译命令、对抗覆盖矩阵**。
+
+---
+
 ## 📦 更新日志
 
 | 日期 | 内容 |
 |------|------|
+| 2026-05-17 | `fscan 免杀特征点与解决技术手册` ✅ 实战验证 — 火绒+360 双过，5 套方案（A/B/C/E/F）+ pe_cleaner.py + 10 条踩坑 |
 | 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.2 重构 — 394→155 行精简；AMSI bypass v3 混淆版（context-zeroing）；三工具 `-Enc` 统一改造；Win2022+Defender 全链路验证通过 |
 | 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.0 — ETW bypass + BXOR 链通过 Win10+Defender 验证；Win2008 R2 全工具 cmd 模式验证通过 |
 | 2026-05-16 | `AdaptixC2 BOF 插件编写指南` ✅ 实战验证 |
