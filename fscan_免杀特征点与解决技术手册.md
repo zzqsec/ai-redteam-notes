@@ -11,6 +11,7 @@
 - 源码模块：`github.com/zzqsec/f`（fork 自 `github.com/shadow1ng/fscan`）
 - 适配环境：Windows 10/11 + Go 1.20 ~ 1.26
 - 绕过目标：火绒 V5.x / 360 V15.x / Windows Defender / 卡巴斯基 KSN / ESET
+- 实测结果：五方案无壳全过 火绒+360+Defender
 - 所有代码仅限授权的渗透测试与安全研究使用
 
 ---
@@ -21,6 +22,7 @@
 |------|---------|---------|
 | **火绒** | Go PE 结构特征（rt0 入口汇编 + pclntab magic + 节区名） | DLL 化 或 编译参数 + PE 清洗 |
 | **360** | 无壳 Go EXE 启发阈值低通常放过；UPX 解压后扫描 `.rdata` 明文字符串 | **不加 UPX 全部可过** |
+| **Defender** | 云端 ML 为主，本地静态检测较弱 | 无壳 + PE 清洗即可过，与 360 行为类似 |
 
 ### 火绒 V5.x 检测流水线
 
@@ -425,36 +427,24 @@ for orig, enc in zip(PLUGINS, encoded):
 ## 方案全景对照（无 UPX）
 
 ```
-           火绒rt0   火绒节区   360
-C (DLL)      ✅        ✅       ✅
-B (Garble)   ❌        ✅       ✅
-A (编译)     ❌        ✅       ✅
-E (strip)    ❌        ✅       ✅
-F (源码)     ❌        ✅       ✅
+           火绒rt0  火绒节区  360  Defender
+C (DLL)      ✅       ✅      ✅     ✅
+B (Garble)   ❌       ✅      ✅     ✅
+A (编译)     ❌       ✅      ✅     ✅
+E (strip)    ❌       ✅      ✅     ✅
+F (源码)     ❌       ✅      ✅     ✅
 ```
 
-> **核心结论：五个方案全部通过火绒+360。**
-> ⚠️ **一加 UPX，360 全部查杀。没有上传体积限制就不建议加壳。**
-
-## 已废弃方案
-
-| 方案 | 死因 |
-|------|------|
-| **D** TinyGo | ssh/smb/mongo-driver 依赖不兼容 |
-| **E** c-archive | Go 1.26 Windows 缺失 `runtime/cgo` |
-| **E** external linker | 产物被火绒杀 |
-| **E** go-strip v0.3.4 | 不兼容 Go 1.26 pclntab 格式（panic: no pclntab located）|
-
----
+> 五方案无壳全过 火绒+360+Defender。一加 UPX 360 全部查杀。**
 
 ## 推荐使用
 
 | 场景 | 方案 | 理由 |
 |------|------|------|
-| **默认首选** | **C** | DLL 化是唯一绕过火绒 rt0 入口检测的方案 |
-| **需要单 EXE** | **B** | Garble `.rdata` 加密，体积偏大但对抗最全面 |
-| **快速出活/无 Garble** | **E** | 纯 Go + strip 一条命令，不依赖外部工具 |
-| **无上传体积限制** | **不建议加 UPX** | 五个方案无壳全过火绒+360，一加 UPX 360 全杀 |
+| **默认首选** | **C** | 唯一绕过火绒 rt0 入口检测 |
+| **单 EXE 最强** | **B** | Garble `.rdata` AES 加密 |
+| **快速出活** | **脚本 `bash build_fscan_evasion.sh`** | 一键 A+F 并行编译，Go 原生 pe_cleaner，无需 Python |
+| **体积限制** | 不加 UPX | 无壳全过，加壳 360 必杀 |
 
 ---
 
@@ -501,155 +491,56 @@ N1 PRO FLASH 火绒 YARA 不含 `runtime.` 字符串匹配。DLL 中 `runtime.` 
 
 ### 坑10：方案间产物存在冗余关系
 
-```
-A 被 E 覆盖（E = A + strip）
-F 与 A 仅在源码字符串层面差异
-```
+A 被 E 覆盖（E = A + strip），F 与 A 仅在源码字符串层面差异。各方案独立保留因对抗面不同。
 
-各方案独立保留是因为 360 和火绒检测面不同，无壳/有壳/EXE/DLL 各有适用场景。
+### 坑11：`//go:embed` 嵌入资源必须纳入替换
+
+`webscan/web_scan.go` 嵌入 `pocs/` 目录（`//go:embed pocs`），`web/server.go` 嵌入 `dist/*`。YAML/JS 文件中的 `shadow1ng/fscan` 会随 embed 编译进 `.rdata`。对策：预扫描所有 `//go:embed` 路径 → 编译前对嵌入的非 .go 文件同样做 `shadow1ng→zzqsec` 替换。**忽略此坑 = 编译完发现残留 → 反复编译（+15min）**。
+
+### 坑12：pe_cleaner 可从 Python/pefile 迁移到 Go 原生
+
+`debug/pe` + `encoding/binary` 即可实现 PE 节区头定位、TimeDateStamp/CheckSum 清零、节区改名，零外部依赖。自动构建脚本 `build_fscan_evasion.sh` 内嵌了 Go 版 pe_cleaner，编译过程无需 `pip install pefile`。
 
 ---
 
-## 公共工具
+## 一键构建脚本
 
-### pe_cleaner.py
+所有方案的源码替换 + 编译 + PE 清洗已整合为单脚本。预计算 XOR 插件名、预扫描 embed 路径、并行编译。
 
-所有 EXE 方案的 PE 后处理共用此脚本。依赖 `pip install pefile`。
-
-```python
-#!/usr/bin/env python3
-"""
-Go EXE Static Feature Stripping Tool
-Targets: Huorong V5.x, 360 Security Guard V15.x
-Dependencies: pip install pefile
-Usage: python pe_cleaner.py <input.exe> <output.exe>
-"""
-
-import pefile, sys
-
-class GoPECleaner:
-    def __init__(self, input_path, output_path):
-        self.input_path = input_path
-        self.output_path = output_path
-        self.pe = pefile.PE(input_path, fast_load=True)
-
-    def wipe_runtime_metadata(self):
-        """字节级清零 Go 运行时元数据段"""
-        target = {b'.gosymtab', b'.gopclntab', b'.buildinfo', b'.note.go.buildid'}
-        for sec in self.pe.sections:
-            name = sec.Name[:8]
-            if name in target:
-                raw = bytearray(sec.get_data())
-                if name == b'.gopclntab':
-                    raw[:32] = b'\x00' * 32   # 覆盖 magic FF FF FB FB
-                elif name == b'.buildinfo':
-                    raw[:] = b'\x00' * len(raw)
-                elif name == b'.gosymtab':
-                    raw[:16] = b'\x00' * 16
-                sec.set_data(bytes(raw))
-                print(f"    [*] Wiped {name.decode().rstrip(chr(0))}")
-
-    def normalize_section_names(self):
-        """重命名 Go 专有节区为通用名称"""
-        mapping = {
-            b'.gosymtab': b'.text\x00\x00\x00',
-            b'.gopclntab': b'.rdata\x00\x00',
-            b'.buildinfo': b'.data\x00\x00\x00',
-            b'.note.go.buildid': b'.reloc\x00\x00\x00'
-        }
-        for sec in self.pe.sections:
-            if sec.Name[:8] in mapping:
-                old = sec.Name[:8].decode().rstrip(chr(0))
-                new = mapping[sec.Name[:8]].decode().rstrip(chr(0))
-                sec.Name = mapping[sec.Name[:8]]
-                print(f"    [*] Renamed {old} -> {new}")
-
-    def strip_fingerprints(self):
-        """清零 PE 头时间戳/校验和 + 清除 BuildID 标记"""
-        self.pe.FILE_HEADER.TimeDateStamp = 0
-        self.pe.OPTIONAL_HEADER.CheckSum = 0
-        print(f"    [*] Zeroed TimeDateStamp and CheckSum")
-
-        data = self.pe.__data__
-        marker = b'go buildid '
-        idx = data.find(marker)
-        while idx != -1:
-            data[idx:idx+len(marker)] = b'\x00' * len(marker)
-            idx = data.find(marker, idx+1)
-            print(f"    [*] Wiped go buildid marker at offset {idx - len(marker)}")
-
-    def shuffle_imports(self):
-        """分析导入表"""
-        if hasattr(self.pe, 'DIRECTORY_ENTRY_IMPORT'):
-            print(f"    [+] Found {len(self.pe.DIRECTORY_ENTRY_IMPORT)} imported modules")
-        else:
-            print(f"    [!] No import directory found")
-
-    def save(self):
-        self.pe.write(self.output_path)
-
-    def run(self):
-        print(f"\n[*] Cleaning PE: {self.input_path}")
-        print(f"[*] Step 1: Wiping runtime metadata...")
-        self.wipe_runtime_metadata()
-        print(f"[*] Step 2: Normalizing section names...")
-        self.normalize_section_names()
-        print(f"[*] Step 3: Stripping fingerprints...")
-        self.strip_fingerprints()
-        print(f"[*] Step 4: Analyzing imports...")
-        self.shuffle_imports()
-        self.save()
-        print(f"[+] Cleaned PE saved to: {self.output_path}\n")
-
-if __name__ == '__main__':
-    cleaner = GoPECleaner(sys.argv[1], sys.argv[2])
-    cleaner.run()
+```bash
+bash Desktop/build_fscan_evasion.sh        # 全部方案
+bash Desktop/build_fscan_evasion.sh A      # 仅方案 A
+bash Desktop/build_fscan_evasion.sh F      # 仅方案 F
 ```
 
-**四步清洗流程：**
+前提：仅需 Go 1.20+，无 Python 依赖。预计 8-10 分钟全量构建。
+
+---
+
+## PE 清洗四步流程
 
 | 步骤 | 操作 | 对抗目标 |
 |------|------|---------|
-| wipe_runtime_metadata | `.gopclntab` 前 32B 清零 / `.buildinfo` 全清 / `.gosymtab` 前 16B 清零 | pclntab magic `FF FF FB FB` |
-| normalize_section_names | Go 节区名 → 通用名 | 节区名启发式 |
-| strip_fingerprints | TimeDateStamp=0 / CheckSum=0 / 清除 `go buildid ` | 云端聚类 |
-| save | 写回 PE | — |
+| 清零节区数据 | `.gopclntab` 前 32B / `.buildinfo` 全清 / `.gosymtab` 前 16B → `\x00` | pclntab magic `FF FF FB FB` |
+| 重命名节区 | `.gosymtab→.text` `.gopclntab→.rdata` `.buildinfo→.data` `.note.go.buildid→.reloc` | 节区名启发式 |
+| 清零 PE 头 | TimeDateStamp=0 / CheckSum=0 / 字节级清除 `go buildid ` 标记 | 云端聚类 |
+| 写回 | 保存修改后 PE | — |
+
+> pe_cleaner 实现见 `build_fscan_evasion.sh` 内嵌的 Go 版（零依赖），或 `pe_cleaner.py`（需 `pip install pefile`）。
 
 ---
 
 ## 核心约束（所有方案必须遵守）
 
-- 必须全局替换 `github.com/shadow1ng` → `github.com/zzqsec`
-- 必须使用 `-ldflags="-s -w -buildid="` 剥离符号与 BuildID
-- 必须使用 `-trimpath` 移除编译路径
-- pe_cleaner.py 后处理清零 TimeDateStamp + CheckSum
-- 所有代码仅限授权的渗透测试与安全研究使用
+- 全局替换 `github.com/shadow1ng` → `github.com/zzqsec`（含 embed 的非 .go 文件）
+- `-ldflags="-s -w -buildid="` + `-trimpath`
+- PE 后处理清零 TimeDateStamp + CheckSum + `go buildid ` 标记
+- **不加 UPX**（360 解压扫 `.rdata` 全杀）
 
-## 验证工具
-
-**verify_pe.py：**
-
-```python
-import pefile, sys
-
-def verify_pe(filepath):
-    pe = pefile.PE(filepath)
-    go_sections = ['.gosymtab', '.gopclntab', '.buildinfo', '.note.go.buildid']
-    found = [sec.Name.decode().rstrip('\x00') for sec in pe.sections
-             if sec.Name.decode().rstrip('\x00') in go_sections]
-    if found:
-        print(f"[!] Go特征节区残留: {found}")
-        return False
-    print("[+] 未发现Go特征节区")
-    return True
-
-sys.exit(0 if verify_pe(sys.argv[1]) else 1)
-```
-
-**二进制字符串扫描：**
+## 二进制验证
 
 ```bash
-grep -abo "shadow1ng" final.exe          # 应为空
-grep -abo "go buildid" final.exe         # 应为空
-grep -abo "fscan" final.exe              # 方案 F 应为空
+grep -abo "shadow1ng" final.exe    # 应为空
+grep -abo "go buildid" final.exe   # 应为空
+grep -abo "fscan" final.exe        # 方案 F 应为空（Go stdlib fmt.Fscan 除外）
 ```
