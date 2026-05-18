@@ -145,7 +145,7 @@ fscan 内网扫描器针对火绒/360/Defender 的完整免杀方案，包含：
 
 | 日期 | 内容 |
 |------|------|
-| 2026-05-17 | `fscan 免杀特征点与解决技术手册` v1.1 — 新增 Defender 实测、一键构建脚本、坑点10→12条、PE清洗四步流程独立章节 |
+| 2026-05-17 | `fscan 免杀特征点与解决技术手册` v1.2 — 一键构建脚本细化（Go原生PE清洗器/embed扫描/XOR插件名混淆/并行编译）|
 | 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.2 重构 — 394→155 行精简；AMSI bypass v3 混淆版（context-zeroing）；三工具 `-Enc` 统一改造；Win2022+Defender 全链路验证通过 |
 | 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.0 — ETW bypass + BXOR 链通过 Win10+Defender 验证；Win2008 R2 全工具 cmd 模式验证通过 |
 | 2026-05-16 | `AdaptixC2 BOF 插件编写指南` ✅ 实战验证 |
