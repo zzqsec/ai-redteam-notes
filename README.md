@@ -145,10 +145,28 @@ fscan 内网扫描器针对火绒/360/Defender 的完整免杀方案，包含：
 
 ---
 
+### 📄 BYOVD BootRepair.sys EDR Killer ✅ 实战验证
+
+> 实测：2026-05-24，Win10 — 火绒 V5.x + 360 V15.x
+
+利用 Lenovo BootRepair.sys 签名驱动无 DACL 漏洞，IOCTL 0x222014 内核级终止任意进程的完整实战指南，包含：
+
+| 模块 | 内容 |
+|------|------|
+| **驱动逆向分析** | DriverEntry → IoCreateDevice（无 DACL）→ IRP_MJ_DEVICE_CONTROL → 单 IOCTL 0x222014 → ZwTerminateProcess |
+| **武器化 PoC** | 完整 C 源码，支持 PID/进程名两种模式，编译即用 |
+| **实战测试** | 火绒 `HipsDaemon.exe` ✅ 一杀就死 | 360 `ZhuDongFangYu.exe` ✅ 能杀但 ~1 分钟自拉活 |
+| **360 循环 Kill** | batch / C 双版本循环杀脚本，持续压制 360 守护进程 |
+| **BYOVD 狩猎方法论** | 厂商白驱动收集 → 批量逆向筛选（有签名+无 DACL+高危 IOCTL）→ 武器化 |
+| **攻击链** | 管理员加载驱动 → 任意用户打开设备 → DeviceIoControl(0x222014, PID) → 内核杀进程 |
+
+---
+
 ## 📦 更新日志
 
 | 日期 | 内容 |
 |------|------|
+| 2026-05-24 | `BYOVD BootRepair.sys EDR Killer` ✅ 实战验证 — 联想签名驱动无 DACL 漏洞武器化，火绒/360 实战测试 |
 | 2026-05-17 | `fscan 免杀特征点与解决技术手册` v1.2 ✅ 实战验证 — 一键构建脚本细化（Go原生PE清洗器/embed扫描/XOR插件名混淆/并行编译）|
 | 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.2 重构 — 394→155 行精简；AMSI bypass v3 混淆版（context-zeroing）；三工具 `-Enc` 统一改造；Win2022+Defender 全链路验证通过 |
 | 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.0 — ETW bypass + BXOR 链通过 Win10+Defender 验证；Win2008 R2 全工具 cmd 模式验证通过 |
