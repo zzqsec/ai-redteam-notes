@@ -162,10 +162,29 @@ fscan 内网扫描器针对火绒/360/Defender 的完整免杀方案，包含：
 
 ---
 
+### 📄 Dirty Frag — Linux 本地提权技术手册 ✅ 实战验证
+
+> 来源：Black Hat Asia 2026 — Hyunwoo Kim (@v4bel)，CVE-2026-43284 + CVE-2026-43500
+
+Dirty Pipe 家族最新成员，利用 splice → socket → in-place crypto 实现内核页缓存写入的确定性别逻辑漏洞提权，包含：
+
+| 模块 | 内容 |
+|------|------|
+| **Dirty Pipe 家族演进** | Dirty Pipe → Copy Fail → Dirty Frag，三代漏洞原理对比 |
+| **ESP 路径 (CVE-2026-43284)** | `esp_input()` 跳过 `skb_cow_data()`，4 字节精确写入页缓存，192 字节 ELF 覆盖 `/usr/bin/su` |
+| **RxRPC 路径 (CVE-2026-43500)** | `rxkad_verify_packet_1()` in-place fcrypt 解密，56-bit 离线爆破密钥，三次 splice 覆盖 `/etc/passwd` |
+| **双路径互覆盖架构** | ESP 优先（user ns 可控），RxRPC 回退（无需特权），自动选择最优攻击路径 |
+| **链式密文修正** | 多 splice 链路中密文互相覆盖的修正算法，确保写入值精确可控 |
+| **完整 PoC** | ESP 路径 root shell + RxRPC 路径 PAM nullok su，含 192 字节静态 ELF payload |
+| **内核影响范围** | ESP ~9 年窗口 (2017-2026) / RxRPC ~3 年窗口 (2023-2026)，Ubuntu/RHEL/CentOS/Fedora/openSUSE 全覆盖 |
+
+---
+
 ## 📦 更新日志
 
 | 日期 | 内容 |
 |------|------|
+| 2026-05-27 | `Dirty Frag Linux 提权技术手册` ✅ 实战验证 — Dirty Pipe 家族最新成员，双 CVE 内核页缓存写入，Ubuntu/RHEL/Fedora 全覆盖 |
 | 2026-05-24 | `BYOVD BootRepair.sys EDR Killer` ✅ 实战验证 — 联想签名驱动无 DACL 漏洞武器化，火绒/360 实战测试 |
 | 2026-05-17 | `fscan 免杀特征点与解决技术手册` v1.2 ✅ 实战验证 — 一键构建脚本细化（Go原生PE清洗器/embed扫描/XOR插件名混淆/并行编译）|
 | 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.2 重构 — 394→155 行精简；AMSI bypass v3 混淆版（context-zeroing）；三工具 `-Enc` 统一改造；Win2022+Defender 全链路验证通过 |
