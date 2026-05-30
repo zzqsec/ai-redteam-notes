@@ -54,6 +54,22 @@ PHP Webshell 生成的完整方法论，包含：
 
 ---
 
+### 📄 哥斯拉 PHP Shell — AI 自动部署与验证指南
+
+> 搭配 [`PHP免杀技术点清单.md`](PHP免杀技术点清单.md) 使用 — 一个管生成，一个管落地。
+
+AI 一键部署哥斯拉 PHP Shell 的完整操作手册，包含：
+
+| 模块 | 内容 |
+|------|------|
+| **AI 执行清单** | 生成 shell → 探测环境 → 部署 → curl 验证 → 输出配置，5 步全自动 |
+| **环境自动探测** | PHP 版本 / web server / web 根目录，不依赖硬编码路径 |
+| **curl 两阶段验证** | Phase1 密码验证 + Phase2 payload 连通测试 |
+| **常见问题** | PHP 版本语法兼容、selinux、open_basedir 等 8 条坑点 |
+| **哥斯拉客户端配置** | 一键输出的连接配置清单 |
+
+---
+
 ### 📄 Java 免杀技术点清单 ✅ 实战验证
 
 > ✅ **已实测：JDK 1.8.0_181 + Tomcat 9.0.74，哥斯拉兼容 Webshell 六层全开版通过验证。**
@@ -184,6 +200,7 @@ Dirty Pipe 家族最新成员，利用 splice → socket → in-place crypto 实
 
 | 日期 | 内容 |
 |------|------|
+| 2026-05-29 | `PHP免杀技术点清单` 更新 + `哥斯拉 PHP Shell AI 自动部署与验证指南` — 两者结合使用，生成→部署→验证全自动化 |
 | 2026-05-27 | `Dirty Frag Linux 提权技术手册` ✅ 实战验证 — Dirty Pipe 家族最新成员，双 CVE 内核页缓存写入，Ubuntu/RHEL/Fedora 全覆盖 |
 | 2026-05-24 | `BYOVD BootRepair.sys EDR Killer` ✅ 实战验证 — 联想签名驱动无 DACL 漏洞武器化，火绒/360 实战测试 |
 | 2026-05-17 | `fscan 免杀特征点与解决技术手册` v1.2 ✅ 实战验证 — 一键构建脚本细化（Go原生PE清洗器/embed扫描/XOR插件名混淆/并行编译）|
