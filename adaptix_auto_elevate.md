@@ -7,7 +7,7 @@
 - 目标 Agent：beacon / gopher / kharon（Windows x64/x86）
 - 提权路径：Admin → SYSTEM
 - 执行方式：全内存（`execute bof` → BOF 加载 .NET PE，无文件落盘）
-- 土豆来源：`c://Potato/`（C2 服务端，14 种 .NET PE）
+- 土豆来源：`c://Potato/`（本地C2 客户端，14 种 .NET PE）
 - BOF Loader：`c://Potato/execute-assembly.x64.o`
 - 插件文件：`auto_elevate.axs`
 
