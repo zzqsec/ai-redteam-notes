@@ -265,5 +265,4 @@ resolveAgentPath 是异步（ps run 等回包）
 - **插件文件**：`auto_elevate.axs`
 - **文档文件**：`adaptix_auto_elevate.md`
 - **日期**：2026-06-23
-- **作者**：海师傅 & 小飞鱼
 - **依赖**：AdaptixC2 + `c://Potato/execute-assembly.x64.o` + 14 土豆 .NET PE
