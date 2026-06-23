@@ -92,6 +92,23 @@ Java Webshell + 内存马的技术框架，包含：
 
 ---
 
+### 📄 AdaptixC2 Auto Elevate — 自动提权插件 ✅ 实战验证
+
+> ✅ **已实测：PrintNotifyPotato → SYSTEM beacon 回连通过。14 种土豆全覆盖，全内存执行无落盘。**
+
+AdaptixC2 AxScript 插件，agent 上线自动检测 admin 权限 → 串行测试土豆家族 → SYSTEM beacon 回连。包含：
+
+| 模块 | 内容 |
+|------|------|
+| **核心架构** | `executeAssemblyInline()` — 自包含 BOF 打包逻辑，不依赖 `execution.axs` 扩展 |
+| **14 种土豆** | PrintNotifyPotato / GodPotato / JuicyPotato / RoguePotato / SweetPotato / EfsPotato / BadPotato / SigmaPotato / DeadPotato / RasMan / McpManagementPotato / PrinterNotifyPotato / JuicyPotatoNG / RottenPotato |
+| **动态路径** | `(Get-Process -Id PID).Path` 取 agent 真实路径，不写死文件名 |
+| **串行测试** | 逐个土豆尝试，失败等 2s 切下一个，竞态安全 |
+| **踩坑记录** | 6 条：控制台 base64 不可追溯 → `ax.console_message` 修复、反斜杠陷阱、`execute-assembly` PreHook 时序、`ps run` 引号剥离、不同土豆输出差异、竞态条件 |
+| **execute bof 链路** | 绕过 Commander PreHook 机制，直接走 agent 内置 BOF 命令，100% 可靠 |
+
+---
+
 ### 📄 Ghost Bits (Cast Attack) 技术总结
 
 > 来源：Black Hat Asia 2026 — 浅蓝 @ AlibabaCloud
@@ -200,6 +217,7 @@ Dirty Pipe 家族最新成员，利用 splice → socket → in-place crypto 实
 
 | 日期 | 内容 |
 |------|------|
+| 2026-06-23 | `adaptix_auto_elevate` ✅ 实战验证 — AdaptixC2 自动提权插件，14 种土豆全覆盖，全内存 execute bof 链路，竞态安全 + 控制台可追溯 |
 | 2026-05-29 | `PHP免杀技术点清单` 更新 + `哥斯拉 PHP Shell AI 自动部署与验证指南` — 两者结合使用，生成→部署→验证全自动化 |
 | 2026-05-27 | `Dirty Frag Linux 提权技术手册` ✅ 实战验证 — Dirty Pipe 家族最新成员，双 CVE 内核页缓存写入，Ubuntu/RHEL/Fedora 全覆盖 |
 | 2026-05-24 | `BYOVD BootRepair.sys EDR Killer` ✅ 实战验证 — 联想签名驱动无 DACL 漏洞武器化，火绒/360 实战测试 |
