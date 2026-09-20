@@ -1,9 +1,6 @@
 # AI Redteam Notes
 
 > 🤖 AI 驱动的红队免杀知识库 — 合法授权的渗透测试与安全研究
->
-> 🛠️ Powered by **QwenPaw Desktop** + **DeepSeek V4 Pro**<br>
-> 🛠️ Powered by **Claude Code** + **DeepSeek V4 Pro**
 
 ✅ **不要偷偷用！点个star在开始~**✅
 请你给我多一点点时间
