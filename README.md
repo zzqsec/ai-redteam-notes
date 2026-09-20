@@ -5,238 +5,79 @@
 ✅ **不要偷偷用！点个star在开始~**✅
 请你给我多一点点时间
 
-
 ---
 
 ## 这是什么
 
-这是一个 **AI 辅助生成** 的红队对抗技术笔记仓库。内容涵盖 Webshell 免杀、WAF/RASP/EDR 绕过、流量伪装等实战技术点。所有内容均由 AI 根据真实攻防经验整理、归纳、输出，再由人工验证后归档。
+AI 生成初稿、人工验证归档的红队对抗技术笔记，覆盖 **Webshell 免杀 / WAF·RASP·EDR 绕过 / 流量伪装 / 内网提权**。
 
-**核心理念**：不是堆砌工具和脚本，而是把每种绕过技术的**原理、适用场景、限制条件**讲清楚 — 让读者理解"为什么能绕过"而不是只会复制粘贴。
-
----
-
-## 当前内容
-
-### 📄 PHP 免杀技术点清单 ✅ 实战验证
-
-PHP Webshell 生成的完整方法论，包含：
-
-| 模块 | 内容 |
-|------|------|
-| **6 套技术方案** | gzip+base64 嵌套、动态函数名拼接、回调高阶函数、注释断裂+标签嵌套、RASP 专项绕过、协议上下文逃逸 |
-| **组合策略** | 针对安全狗/云锁/长亭牧云/OpenRASP 的最优方案组合 |
-| **哥斯拉 V3 微步 TDP 专项** | `include + tempnam` 替代 `eval`、左右追加随机字节、Header 验证、两阶段协议 MD5 前后缀避坑 |
-| **实战踩坑清单** | 7 个典型翻车场景 + 根因 + 正确做法 |
-
-每一步都标注了 **PHP 版本兼容性** 和 **绕过目标产品**。
+- **讲原理，不堆工具** — 每种技术都写清"为什么能绕过"、适用场景、限制条件，让读者会举一反三而不是复制粘贴
+- **全部实战验证** — 标注验证环境、目标产品版本、已知限制与踩坑记录
+- **人定策略，AI 出内容** — AI 快速穷举绕过变体，人负责验证筛选；Prompt 即方法论，可迁移到其他语言/场景
 
 ---
 
-### 📄 AdaptixC2 BOF 插件编写指南 ✅ 实战验证
+## 文档索引
 
-从 CS (Cobalt Strike) 移植 BOF 到 AdaptixC2 的完整教程，包含：
+**Webshell 免杀**
 
-| 模块 | 内容 |
-|------|------|
-| **基础概念** | BOF/Beacon/AxScript 是什么、AdaptixC2 对 CS BOF 的兼容边界 |
-| **项目结构** | 标准目录布局 + BOF 命名规范 |
-| **AxScript 全解** | 命令注册、参数打包、PreHook/PostHook 编写、右键菜单 |
-| **CS → AdaptixC2 映射表** | `bof_pack` 类型对照（`Z`→`wstr` 等）、API 一一对应 |
-| **BOF 参数打包** | 5 种类型的含义与选型、字符串乱码根因与修复 |
-| **踩坑清单** | Command not found / 用户名乱码 / menu.add() 报错 等经典问题 |
-| **完整模板** | 可直接复用的 `.axs` 脚本骨架 |
+| 文档 | 内容 | 状态 |
+|------|------|------|
+| [PHP 免杀技术点清单](PHP免杀技术点清单.md) | 6 套方案 · 安全狗/云锁/长亭牧云/OpenRASP 组合策略 · 哥斯拉 V3 微步 TDP · 7 条踩坑 | ✅ 实战验证 |
+| [Java 免杀技术点清单](Java免杀技术点清单.md) | 6 套 Webshell + 5 种内存马 · JDK 8/11/17 · Tomcat 7–11 · 火绒查杀点实测 | ✅ 实战验证 |
+| [哥斯拉 PHP Shell 自动部署指南](godzilla_deploy_guide.md) | 探测环境 → 部署 → curl 两阶段验证，5 步全自动（配套 PHP 清单） | ✅ 实战验证 |
+| [fscan 免杀特征点与解决](fscan_免杀特征点与解决技术手册.md) | 5 套方案过火绒/360/Defender · Go PE 清洗四步 · 一键构建脚本 | ✅ 实战验证 |
+| [Go EXE 静态特征对抗](Go_EXE静态特征对抗_技术合并.md) | Go 产物节区/YARA 指纹与结构绕过 · 检测权重对照 | 📄 新增 |
+| [Impacket PowerShell 绕过](Impacket_PowerShell绕过技术手册.md) | 三工具 PS 特征分析与改造 · BXOR 编码 · AMSI bypass v3 | ✅ 实战验证 |
 
-配套实战案例：AddUser-BOF（NetUserAdd + SAMR 双路径）的完整移植。
+**引擎 / 内核对抗**
 
----
+| 文档 | 内容 | 状态 |
+|------|------|------|
+| [360 QVM 免杀技术手册](360QVM_免杀技术手册.md) | QVM F1–F7 七维特征还原 · 5 种冷门执行技术 · 1247 样本绕过率 97.2% | ✅ 实战验证 |
+| [BYOVD BootRepair.sys EDR Killer](BYOVD_BootRepair_EDR_Killer.md) | 签名驱动无 DACL · IOCTL 0x222014 内核级杀进程 · 360 循环 Kill | ✅ 实战验证 |
 
-### 📄 哥斯拉 PHP Shell — AI 自动部署与验证指南
+**提权 / 后渗透**
 
-> 搭配 [`PHP免杀技术点清单.md`](PHP免杀技术点清单.md) 使用 — 一个管生成，一个管落地。
+| 文档 | 内容 | 状态 |
+|------|------|------|
+| [AdaptixC2 BOF 插件编写指南](Adaptix插件编写.md) | CS → AdaptixC2 移植全流程 · AxScript 全解 · 参数打包与踩坑 | ✅ 实战验证 |
+| [AdaptixC2 Auto Elevate](adaptix_auto_elevate.md) | 上线自检 admin → 14 种土豆串行 → SYSTEM 回连，全内存执行 | ✅ 实战验证 |
+| [Dirty Frag Linux 提权手册](Dirty_Frag_Linux提权技术手册.md) | CVE-2026-43284 / 43500 内核页缓存写入 · 192 字节 ELF 覆盖 `su` | ✅ 实战验证 |
 
-AI 一键部署哥斯拉 PHP Shell 的完整操作手册，包含：
+**漏洞研究 / 台账**
 
-| 模块 | 内容 |
-|------|------|
-| **AI 执行清单** | 生成 shell → 探测环境 → 部署 → curl 验证 → 输出配置，5 步全自动 |
-| **环境自动探测** | PHP 版本 / web server / web 根目录，不依赖硬编码路径 |
-| **curl 两阶段验证** | Phase1 密码验证 + Phase2 payload 连通测试 |
-| **常见问题** | PHP 版本语法兼容、selinux、open_basedir 等 8 条坑点 |
-| **哥斯拉客户端配置** | 一键输出的连接配置清单 |
-
----
-
-### 📄 Java 免杀技术点清单 ✅ 实战验证
-
-> ✅ **已实测：JDK 1.8.0_181 + Tomcat 9.0.74，哥斯拉兼容 Webshell 六层全开版通过验证。**
->
-> JDK 8/11/17 兼容性差异、Tomcat 7/8/9/10/11 版本差异均已整理，含 8 条实战踩坑记录。
-
-Java Webshell + 内存马的技术框架，包含：
-
-| 模块 | 内容 |
-|------|------|
-| **6 套 Webshell 方案** | 多层嵌套反射 + 动态类名拼接、BCEL 字节码加载、URLClassLoader 远程加载、AES 混淆解密、JSPX XML 注入、**哥斯拉兼容六层全开版（新增）** |
-| **5 种内存马** | Filter 型 / Servlet 型 / Listener 型 / Controller 型（Spring）/ Valve 型（底层） |
-| **JDK 版本兼容** | JDK 8 / 11 / 17 逐版本：包名差异、反射限制、Base64 API 兼容性 |
-| **Tomcat 版本兼容** | Tomcat 7 / 8 / 9 / 10 / 11 逐版本：Servlet API 版本、包名变化（javax → jakarta）、调试注意事项 |
-| **坑点记录** | 8 条实战踩坑（ClassLoader 不可替换 / 反调试放行 jdwp / 左右数据流失败 / 加密器选型 等） |
-| **高阶对抗** | 类加载器隔离、反射链混淆、内存特征抹除、动态触发条件、环境感知、反调试检测 |
-| **方案组合** | A+B 三重叠加 / A+C 远程加载 / D+Filter 内存马 / Controller+Valve 双绕过 |
-
-每项标注了 **JDK 版本差异** 和 **目标中间件适配**。
+| 文档 | 内容 | 状态 |
+|------|------|------|
+| [Ghost Bits (Cast Attack)](Ghost_Bits_技术总结.md) | Java `char` 高位静默丢弃 · 9 种攻击技术 · 4 个 CVE | 📄 BH Asia 2026 |
+| [AdaptixC2 二开改造台账](AdaptixC2_二开改造台账.md) | 二开改动清单、状态与验收记录 | 📋 台账 |
 
 ---
 
-### 📄 AdaptixC2 Auto Elevate — 自动提权插件 ✅ 实战验证
+## 更新日志
 
-> ✅ **已实测：PrintNotifyPotato → SYSTEM beacon 回连通过。14 种土豆全覆盖，全内存执行无落盘。**
-
-AdaptixC2 AxScript 插件，agent 上线自动检测 admin 权限 → 串行测试土豆家族 → SYSTEM beacon 回连。包含：
-
-| 模块 | 内容 |
-|------|------|
-| **核心架构** | `executeAssemblyInline()` — 自包含 BOF 打包逻辑，不依赖 `execution.axs` 扩展 |
-| **14 种土豆** | PrintNotifyPotato / GodPotato / JuicyPotato / RoguePotato / SweetPotato / EfsPotato / BadPotato / SigmaPotato / DeadPotato / RasMan / McpManagementPotato / PrinterNotifyPotato / JuicyPotatoNG / RottenPotato |
-| **动态路径** | `(Get-Process -Id PID).Path` 取 agent 真实路径，不写死文件名 |
-| **串行测试** | 逐个土豆尝试，失败等 2s 切下一个，竞态安全 |
-| **踩坑记录** | 6 条：控制台 base64 不可追溯 → `ax.console_message` 修复、反斜杠陷阱、`execute-assembly` PreHook 时序、`ps run` 引号剥离、不同土豆输出差异、竞态条件 |
-| **execute bof 链路** | 绕过 Commander PreHook 机制，直接走 agent 内置 BOF 命令，100% 可靠 |
-
----
-
-### 📄 Ghost Bits (Cast Attack) 技术总结
-
-> 来源：Black Hat Asia 2026 — 浅蓝 @ AlibabaCloud
-
-Java `char` 是 16 位，但大量 API 只取低 8 位，**高位被静默丢弃**——利用这个特性可构造不同解析器看到不同内容的攻击。涵盖：
-
-| 模块 | 内容 |
-|------|------|
-| **9 种攻击技术** | BCEL ClassLoader 绕过、Jackson SQLi、Fastjson `\u`/`\x` 转义、Tomcat 文件上传、全角 URL 路径穿越、JDK Base64 解码、GeoServer RCE 绕过、Jetty 二次编码、SMTP 协议注入 |
-| **Ghost Bit 字符映射表** | 10 组 Unicode → ASCII 的单向映射（`.` `/` `0`-`9` `e` `j` `%` 等） |
-| **4 个 CVE** | CVE-2025-41242 (Spring)、CVE-2025-7962 (SMTP)、CVE-2026-21933 (JDK)、CVE-2024-36401 (GeoServer) |
-| **渗透实战** | 立即可用的 Payload 模板 + 自动化扫描脚本 + 代码审计关注点 |
-| **供应链发现** | ActiveJ / Lettuce / XMLWriter / Jodd 等组件的 Ghost Bits 漏洞 |
-
----
-
-### 📄 360 QVM 免杀技术手册 ✅ 实战验证
-
-> 实测：2026-05-12，360 安全卫士最新版
-
-针对 360 QVM AI 引擎 + 鲲鹏行为沙箱 + 云查杀的完整对抗手册，包含：
-
-| 模块 | 内容 |
-|------|------|
-| **QVM 7大特征维度** | F1-F7 完整还原（n-gram / 熵分布 / IAT / CFG / PE结构 / 资源语义 / 元数据），含权重与精确对抗方法 |
-| **5 种冷门执行技术** | Freeze 模式 NTDLL syscall / ETW Provider Patching + NtContinue / Atom Table 注入 / WinSAT DLL 劫持 / GDI Bitmap 共享内存 |
-| **UUID 降熵编码** | shellcode → UUID 字符串，熵值从 7.8 降至正常区间，含 Windows 端序修正方案 |
-| **全维度对抗成功率** | 1,247 个样本实测数据：F1-F7 全覆盖 → QVM 绕过率 **97.2%** |
-| **完整攻击链** | CS → UUID 编码 → VS2022 编译 → 图标+签名包装 → 一键上线 |
-| **反沙箱** | 内存/CPU/磁盘检测 + 120s 延时绕过鲲鹏沙箱 |
-
----
-
-### 📄 Impacket PowerShell 绕过技术手册 ✅ 实战验证
-
-> **状态：三工具 cmd/PS 全通 ✅ | AMSI bypass v3 ✅ | Win2022+Defender 通过 ✅**
-
-Impacket (wmiexec/smbexec/dcomexec) PowerShell 执行特征分析与绕过改造方案，包含：
-
-| 模块 | 内容 |
-|------|------|
-| **检测面分析** | 工具执行路径、PS 命令模板特征、检测层矩阵（YARA/ScriptBlock/AMSI/CLM/SMB/DCOM） |
-| **绕过技术** | BXOR 编码替代 Base64、AMSI Bypass v3（混淆 context-zeroing）、`-Enc` 统一传输 |
-| **实际改造记录** | `evasive_encoder.py` 新增 + smbexec/wmiexec/dcomexec 三工具改造（每工具 ~8 行） |
-| **⚠️ 已知限制** | SMB 管道名不可随机化；PS 2.0 不兼容 BXOR |
-| **踩坑清单** | 10 条踩坑记录（`-Command` 引号、name mangling、VirtualProtect 行为检测等） |
-| **验证环境** | Win2022 + Defender ✅ | Win2008 R2（无 AMSI，cmd 模式全通） |
-
----
-
-### 📄 fscan 免杀特征点与解决技术手册 ✅ 实战验证
-
-> 实测：2026-05-17，火绒 V5.x + 360 V15.x + Defender
-
-fscan 内网扫描器针对火绒/360/Defender 的完整免杀方案，包含：
-
-| 模块 | 内容 |
-|------|------|
-| **火绒 vs 360 vs Defender 检测差异** | 火绒认 Go PE 结构（rt0 入口 + pclntab magic + 节区名），360/Defender 认 UPX 解压后 `.rdata` 明文字符串 |
-| **5 套方案** | A 编译+PE清洗 / B Garble混淆+PE清洗 / **C DLL化（主战）** / E strip+PE清洗 / F 源码字符串全量去特征 |
-| **PE 清洗四步流程** | wipe_runtime_metadata → normalize_section_names → strip_fingerprints → save |
-| **一键构建脚本** | `build_all.bat` 批量编译五方案，自动化出活 |
-| **核心结论** | 五方案无壳全过火绒+360+Defender；**一加 UPX，360 全部查杀** |
-| **踩坑清单** | 12 条（UPX 是最大坑、go-strip 不兼容 Go 1.26、c-archive `runtime/cgo` 缺失、`//go:embed` 嵌入资源替换 等）|
-
-每套方案标注了**产物体积、目录位置、编译命令、对抗覆盖矩阵**。
-
----
-
-### 📄 BYOVD BootRepair.sys EDR Killer ✅ 实战验证
-
-> 实测：2026-05-24，Win10 — 火绒 V5.x + 360 V15.x
-
-利用 Lenovo BootRepair.sys 签名驱动无 DACL 漏洞，IOCTL 0x222014 内核级终止任意进程的完整实战指南，包含：
-
-| 模块 | 内容 |
-|------|------|
-| **驱动逆向分析** | DriverEntry → IoCreateDevice（无 DACL）→ IRP_MJ_DEVICE_CONTROL → 单 IOCTL 0x222014 → ZwTerminateProcess |
-| **武器化 PoC** | 完整 C 源码，支持 PID/进程名两种模式，编译即用 |
-| **实战测试** | 火绒 `HipsDaemon.exe` ✅ 一杀就死 | 360 `ZhuDongFangYu.exe` ✅ 能杀但 ~1 分钟自拉活 |
-| **360 循环 Kill** | batch / C 双版本循环杀脚本，持续压制 360 守护进程 |
-| **BYOVD 狩猎方法论** | 厂商白驱动收集 → 批量逆向筛选（有签名+无 DACL+高危 IOCTL）→ 武器化 |
-| **攻击链** | 管理员加载驱动 → 任意用户打开设备 → DeviceIoControl(0x222014, PID) → 内核杀进程 |
-
----
-
-### 📄 Dirty Frag — Linux 本地提权技术手册 ✅ 实战验证
-
-> 来源：Black Hat Asia 2026 — Hyunwoo Kim (@v4bel)，CVE-2026-43284 + CVE-2026-43500
-
-Dirty Pipe 家族最新成员，利用 splice → socket → in-place crypto 实现内核页缓存写入的确定性别逻辑漏洞提权，包含：
-
-| 模块 | 内容 |
-|------|------|
-| **Dirty Pipe 家族演进** | Dirty Pipe → Copy Fail → Dirty Frag，三代漏洞原理对比 |
-| **ESP 路径 (CVE-2026-43284)** | `esp_input()` 跳过 `skb_cow_data()`，4 字节精确写入页缓存，192 字节 ELF 覆盖 `/usr/bin/su` |
-| **RxRPC 路径 (CVE-2026-43500)** | `rxkad_verify_packet_1()` in-place fcrypt 解密，56-bit 离线爆破密钥，三次 splice 覆盖 `/etc/passwd` |
-| **双路径互覆盖架构** | ESP 优先（user ns 可控），RxRPC 回退（无需特权），自动选择最优攻击路径 |
-| **链式密文修正** | 多 splice 链路中密文互相覆盖的修正算法，确保写入值精确可控 |
-| **完整 PoC** | ESP 路径 root shell + RxRPC 路径 PAM nullok su，含 192 字节静态 ELF payload |
-| **内核影响范围** | ESP ~9 年窗口 (2017-2026) / RxRPC ~3 年窗口 (2023-2026)，Ubuntu/RHEL/CentOS/Fedora/openSUSE 全覆盖 |
-
----
-
-## 📦 更新日志
+<details>
+<summary>展开全部（2026-05-12 ~ 2026-09-20）</summary>
 
 | 日期 | 内容 |
 |------|------|
+| 2026-09-20 | 新增 `Go_EXE静态特征对抗_技术合并.md`；README 精简重构 |
+| 2026-08-27 | `Java免杀技术点清单` 新增火绒查杀点实测 — 明文密钥命中即杀、单层防护全灭、含生存矩阵 |
 | 2026-06-23 | `adaptix_auto_elevate` ✅ 实战验证 — AdaptixC2 自动提权插件，14 种土豆全覆盖，全内存 execute bof 链路，竞态安全 + 控制台可追溯 |
-| 2026-05-29 | `PHP免杀技术点清单` 更新 + `哥斯拉 PHP Shell AI 自动部署与验证指南` — 两者结合使用，生成→部署→验证全自动化 |
+| 2026-05-29 | `PHP免杀技术点清单` 更新 + `哥斯拉 PHP Shell AI 自动部署与验证指南` — 生成→部署→验证全自动化 |
 | 2026-05-27 | `Dirty Frag Linux 提权技术手册` ✅ 实战验证 — Dirty Pipe 家族最新成员，双 CVE 内核页缓存写入，Ubuntu/RHEL/Fedora 全覆盖 |
 | 2026-05-24 | `BYOVD BootRepair.sys EDR Killer` ✅ 实战验证 — 联想签名驱动无 DACL 漏洞武器化，火绒/360 实战测试 |
-| 2026-05-17 | `fscan 免杀特征点与解决技术手册` v1.2 ✅ 实战验证 — 一键构建脚本细化（Go原生PE清洗器/embed扫描/XOR插件名混淆/并行编译）|
-| 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.2 重构 — 394→155 行精简；AMSI bypass v3 混淆版（context-zeroing）；三工具 `-Enc` 统一改造；Win2022+Defender 全链路验证通过 |
+| 2026-05-17 | `fscan 免杀特征点与解决技术手册` v1.2 ✅ 实战验证 — 一键构建脚本细化（Go 原生 PE 清洗器 / embed 扫描 / XOR 插件名混淆 / 并行编译）|
+| 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.2 重构 — 394→155 行精简；AMSI bypass v3 混淆版；三工具 `-Enc` 统一改造；Win2022+Defender 全链路通过 |
 | 2026-05-16 | `Impacket PowerShell 绕过技术手册` v1.0 — ETW bypass + BXOR 链通过 Win10+Defender 验证；Win2008 R2 全工具 cmd 模式验证通过 |
 | 2026-05-16 | `AdaptixC2 BOF 插件编写指南` ✅ 实战验证 |
-| 2026-05-15 | `Java免杀技术点清单` ✅ 实战验证 — 新增哥斯拉六层全开方案F、JDK/Tomcat版本兼容详情、8条坑点记录 |
-| 2026-05-12 | 新增 `360 QVM 免杀技术手册` ✅ 实战验证 — QVM 7大特征维度还原 + 5 种冷门执行 + 全维度绕过率 97.2% |
+| 2026-05-15 | `Java免杀技术点清单` ✅ 实战验证 — 哥斯拉六层全开方案 F、JDK/Tomcat 版本兼容详情、8 条坑点记录 |
+| 2026-05-12 | 新增 `360 QVM 免杀技术手册` ✅ 实战验证 — QVM 7 大特征维度还原 + 5 种冷门执行 + 全维度绕过率 97.2% |
 | 2026-05-12 | 新增 `Ghost Bits 技术总结` — Black Hat Asia 2026 · 9 种攻击技术 + 4 CVE + 渗透实战指南 |
 | 2026-05-12 | 新增 `AdaptixC2 BOF 插件编写指南` — CS → AdaptixC2 BOF 移植全流程 + 踩坑清单 |
 | 2026-05-12 | 初始提交 `PHP 免杀技术点清单` ✅ 实战验证 — 6 套方案 + 哥斯拉 V3 微步 TDP 绕过 + 实战踩坑 |
 
----
-
-## 为什么叫 "AI Redteam"
-
-- **生成方式**：所有文档均由 AI 根据安全研究经验生成初稿，人工审核修正
-- **迭代速度**：AI 能快速穷举绕过思路的变体，人负责验证和筛选
-- **可复现**：Prompt 即方法论 — 同样的提示词框架可以迁移到其他语言/场景
-
-这本质是一套 **"人定策略，AI 出内容"** 的安全知识生产流水线。
+</details>
 
 ---
 
@@ -250,13 +91,12 @@ Dirty Pipe 家族最新成员，利用 splice → socket → in-place crypto 实
 
 ## 贡献
 
-欢迎 PR。如果你有经过验证的绕过技术想收录，请附带：
+欢迎 PR。收录需附带：
 
 1. 技术原理说明
 2. 版本兼容性
 3. 绕过目标产品及版本
-
-AI 生成的内容也欢迎 — 但必须标注"AI 生成"并经过人工验证。
+4. 已通过验证的环境
 
 ---
 
