@@ -9,7 +9,7 @@
 
 ## 这是什么
 
-AI 生成初稿、人工验证归档的红队对抗技术笔记，覆盖 **Webshell 免杀 / WAF·RASP·EDR 绕过 / 流量伪装 / 内网提权**。
+AI 生成初稿、人工验证归档的红队对抗技术笔记，覆盖 **Webshell 免杀 / WAF·RASP·EDR 绕过 / 内网提权**。
 
 - **讲原理，不堆工具** — 每种技术都写清"为什么能绕过"、适用场景、限制条件，让读者会举一反三而不是复制粘贴
 - **全部实战验证** — 标注验证环境、目标产品版本、已知限制与踩坑记录
@@ -19,38 +19,50 @@ AI 生成初稿、人工验证归档的红队对抗技术笔记，覆盖 **Websh
 
 ## 文档索引
 
-**Webshell 免杀**
+> 按攻击链分组：初始载荷 → 工具免杀 → 杀软引擎/内核 → C2 工程 → 提权后渗透 → 底层漏洞研究。
+
+**一、Webshell 免杀（PHP / Java）**
 
 | 文档 | 内容 | 状态 |
 |------|------|------|
 | [PHP 免杀技术点清单](PHP免杀技术点清单.md) | 6 套方案 · 安全狗/云锁/长亭牧云/OpenRASP 组合策略 · 哥斯拉 V3 微步 TDP · 7 条踩坑 | ✅ 实战验证 |
 | [Java 免杀技术点清单](Java免杀技术点清单.md) | 6 套 Webshell + 5 种内存马 · JDK 8/11/17 · Tomcat 7–11 · 火绒查杀点实测 | ✅ 实战验证 |
 | [哥斯拉 PHP Shell 自动部署指南](godzilla_deploy_guide.md) | 探测环境 → 部署 → curl 两阶段验证，5 步全自动（配套 PHP 清单） | ✅ 实战验证 |
-| [fscan 免杀特征点与解决](fscan_免杀特征点与解决技术手册.md) | 5 套方案过火绒/360/Defender · Go PE 清洗四步 · 一键构建脚本 | ✅ 实战验证 |
-| [Go EXE 静态特征对抗](Go_EXE静态特征对抗_技术合并.md) | Go 产物节区/YARA 指纹与结构绕过 · 检测权重对照 | 📄 新增 |
-| [Impacket PowerShell 绕过](Impacket_PowerShell绕过技术手册.md) | 三工具 PS 特征分析与改造 · BXOR 编码 · AMSI bypass v3 | ✅ 实战验证 |
 
-**引擎 / 内核对抗**
+**二、工具免杀（Go / PowerShell）**
+
+| 文档 | 内容 | 状态 |
+|------|------|------|
+| [fscan 免杀特征点与解决](fscan_免杀特征点与解决技术手册.md) | Go 扫描器 5 套方案过火绒/360/Defender · Go PE 清洗四步 · 一键构建脚本 | ✅ 实战验证 |
+| [Go EXE 静态特征对抗](Go_EXE静态特征对抗_技术合并.md) | Go 产物节区/YARA 指纹与结构绕过 · 检测权重对照 | 📄 新增 |
+| [Impacket PowerShell 绕过](Impacket_PowerShell绕过技术手册.md) | 横向移动三件套 PS 特征分析与改造 · BXOR 编码 · AMSI bypass v3 | ✅ 实战验证 |
+
+**三、杀软引擎 / 内核对抗**
 
 | 文档 | 内容 | 状态 |
 |------|------|------|
 | [360 QVM 免杀技术手册](360QVM_免杀技术手册.md) | QVM F1–F7 七维特征还原 · 5 种冷门执行技术 · 1247 样本绕过率 97.2% | ✅ 实战验证 |
 | [BYOVD BootRepair.sys EDR Killer](BYOVD_BootRepair_EDR_Killer.md) | 签名驱动无 DACL · IOCTL 0x222014 内核级杀进程 · 360 循环 Kill | ✅ 实战验证 |
 
-**提权 / 后渗透**
+**四、C2 工程（AdaptixC2）**
 
 | 文档 | 内容 | 状态 |
 |------|------|------|
 | [AdaptixC2 BOF 插件编写指南](Adaptix插件编写.md) | CS → AdaptixC2 移植全流程 · AxScript 全解 · 参数打包与踩坑 | ✅ 实战验证 |
+| [AdaptixC2 v1.2 二开改造思路](AdaptixC2_二开改造台账.md) | 按「被谁发现」分五层改造：TLS 指纹 / 默认值 / 植入体形态 / 会话密钥 / 显示层 · 只讲原则不含代码 | 📋 思路 |
+
+**五、提权 / 后渗透**
+
+| 文档 | 内容 | 状态 |
+|------|------|------|
 | [AdaptixC2 Auto Elevate](adaptix_auto_elevate.md) | 上线自检 admin → 14 种土豆串行 → SYSTEM 回连，全内存执行 | ✅ 实战验证 |
 | [Dirty Frag Linux 提权手册](Dirty_Frag_Linux提权技术手册.md) | CVE-2026-43284 / 43500 内核页缓存写入 · 192 字节 ELF 覆盖 `su` | ✅ 实战验证 |
 
-**漏洞研究 / 台账**
+**六、漏洞研究**
 
 | 文档 | 内容 | 状态 |
 |------|------|------|
 | [Ghost Bits (Cast Attack)](Ghost_Bits_技术总结.md) | Java `char` 高位静默丢弃 · 9 种攻击技术 · 4 个 CVE | 📄 BH Asia 2026 |
-| [AdaptixC2 v1.2 二开改造思路](AdaptixC2_二开改造台账.md) | 按「被谁发现」分五层改造：TLS 指纹 / 默认值 / 植入体形态 / 会话密钥 / 显示层 · 只讲原则不含代码 | 📋 思路 |
 
 ---
 
